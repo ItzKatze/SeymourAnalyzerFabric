@@ -71,5 +71,5 @@ minecraft_*/
 .gradle/loom-cache/
 .gradle/minecraft/
 
-# conversion helpers
-scripts/*
+# Conversion helpers (local only)
+scripts/
