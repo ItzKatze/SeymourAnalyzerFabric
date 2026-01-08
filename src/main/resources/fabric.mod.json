@@ -3,13 +3,13 @@
 	"id": "seymouranalyzer",
 	"version": "${version}",
 	"name": "Seymour Analyzer",
-	"description": "Advanced color analysis and collection tool for dyed leather armor in Hypixel Skyblock",
+	"description": "Advanced color analysis and collection tool for Seymour Armour in Hypixel Skyblock",
 	"authors": [
 		"Schnerry"
 	],
 	"contact": {
-		"homepage": "https://github.com/Schnerry/SeymourAnalyzer",
-		"sources": "https://github.com/Schnerry/SeymourAnalyzer"
+		"homepage": "https://github.com/Schnerry/SeymourAnalyzerFabric",
+		"sources": "https://github.com/Schnerry/SeymourAnalyzerFabric"
 	},
 	"license": "GPL-3.0-or-later",
 	"icon": "assets/seymouranalyzer/icon.png",
