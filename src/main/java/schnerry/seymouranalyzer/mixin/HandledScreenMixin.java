@@ -34,13 +34,13 @@ public abstract class HandledScreenMixin {
     protected Slot focusedSlot;
 
     /**
-     * Inject after each slot is drawn to render our highlight
+     * Inject before each slot is drawn to render our highlight behind the item
      * This runs in the exact coordinate space as the slot, so no offset calculations needed
      * ALSO track the hovered slot here since we KNOW it exists at this point
      */
     @Inject(
         method = "drawSlot",
-        at = @At("TAIL")
+        at = @At("HEAD")
     )
     private void onDrawSlot(DrawContext context, Slot slot, CallbackInfo ci) {
         ItemStack stack = slot.getStack();

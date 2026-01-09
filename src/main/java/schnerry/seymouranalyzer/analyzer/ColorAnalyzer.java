@@ -138,7 +138,7 @@ public class ColorAnalyzer {
 
     private int calculateTier(double deltaE, boolean isCustom, boolean isFade) {
         if (isCustom) {
-            if (deltaE <= 2) return 0;  // Custom T1
+            if (deltaE <= 2) return 1;  // Custom T1
             if (deltaE <= 5) return 2;  // Custom T2
             return 3;
         }

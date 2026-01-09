@@ -88,7 +88,9 @@ public class GuiScaleManager {
         if (screen == null) return false;
 
         String className = screen.getClass().getName();
-        return className.startsWith("schnerry.seymouranalyzer.gui.");
+        // Check if it's in gui package or config package (for PriorityEditorScreen)
+        return className.startsWith("schnerry.seymouranalyzer.gui.") ||
+               className.startsWith("schnerry.seymouranalyzer.config.");
     }
 
     /**

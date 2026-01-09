@@ -41,6 +41,9 @@ public class ClothConfig {
     // Toggle settings - Scanning
     private boolean itemFramesEnabled = false;
 
+    // Match priorities - Higher in list = higher priority for highlights
+    private java.util.List<MatchPriority> matchPriorities = getDefaultMatchPriorities();
+
     // Custom data
     private Map<String, String> customColors = new HashMap<>();
     private Map<String, String> wordList = new HashMap<>();
@@ -80,6 +83,22 @@ public class ClothConfig {
                 if (json.has("dupesEnabled")) dupesEnabled = json.get("dupesEnabled").getAsBoolean();
                 if (json.has("showHighFades")) showHighFades = json.get("showHighFades").getAsBoolean();
                 if (json.has("itemFramesEnabled")) itemFramesEnabled = json.get("itemFramesEnabled").getAsBoolean();
+
+                if (json.has("matchPriorities")) {
+                    matchPriorities = new java.util.ArrayList<>();
+                    json.getAsJsonArray("matchPriorities").forEach(element -> {
+                        MatchPriority priority = MatchPriority.fromName(element.getAsString());
+                        if (priority != null) {
+                            matchPriorities.add(priority);
+                        }
+                    });
+                    // Add any missing priorities at the end
+                    for (MatchPriority priority : MatchPriority.values()) {
+                        if (!matchPriorities.contains(priority)) {
+                            matchPriorities.add(priority);
+                        }
+                    }
+                }
 
                 Seymouranalyzer.LOGGER.info("Loaded config from file");
             }
@@ -125,6 +144,10 @@ public class ClothConfig {
             json.addProperty("dupesEnabled", dupesEnabled);
             json.addProperty("showHighFades", showHighFades);
             json.addProperty("itemFramesEnabled", itemFramesEnabled);
+
+            com.google.gson.JsonArray prioritiesArray = new com.google.gson.JsonArray();
+            matchPriorities.forEach(priority -> prioritiesArray.add(priority.name()));
+            json.add("matchPriorities", prioritiesArray);
 
             try (FileWriter writer = new FileWriter(configFile)) {
                 GSON.toJson(json, writer);
@@ -254,6 +277,47 @@ public class ClothConfig {
 
     public Map<String, String> getWordList() {
         return wordList;
+    }
+
+    // Match Priorities
+    public java.util.List<MatchPriority> getMatchPriorities() {
+        return matchPriorities;
+    }
+
+    public void setMatchPriorities(java.util.List<MatchPriority> matchPriorities) {
+        this.matchPriorities = matchPriorities;
+        // Clear highlight cache so items re-calculate with new priorities
+        schnerry.seymouranalyzer.render.ItemSlotHighlighter.getInstance().clearCache();
+    }
+
+    /**
+     * Get priority index (lower number = higher priority)
+     * Returns -1 if not found
+     */
+    public int getPriorityIndex(MatchPriority priority) {
+        return matchPriorities.indexOf(priority);
+    }
+
+    /**
+     * Default priority order
+     * Search > Dupe > Word > Pattern > Custom T1/T2 > Normal T0/T1/T2 > Fade T0/T1/T2
+     * Note: Custom colors only have T1 and T2 (no T0)
+     */
+    public static java.util.List<MatchPriority> getDefaultMatchPriorities() {
+        return java.util.Arrays.asList(
+            MatchPriority.SEARCH,
+            MatchPriority.DUPE,
+            MatchPriority.WORD,
+            MatchPriority.PATTERN,
+            MatchPriority.CUSTOM_T1,
+            MatchPriority.CUSTOM_T2,
+            MatchPriority.NORMAL_T0,
+            MatchPriority.NORMAL_T1,
+            MatchPriority.NORMAL_T2,
+            MatchPriority.FADE_T0,
+            MatchPriority.FADE_T1,
+            MatchPriority.FADE_T2
+        );
     }
 }
 

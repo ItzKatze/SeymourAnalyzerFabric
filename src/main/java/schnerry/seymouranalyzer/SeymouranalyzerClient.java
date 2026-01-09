@@ -46,6 +46,17 @@ public class SeymouranalyzerClient implements ClientModInitializer {
         schnerry.seymouranalyzer.gui.GuiScaleManager.getInstance();
         Seymouranalyzer.LOGGER.info("Initialized GuiScaleManager");
 
+        // Generate checklist caches on startup (runs async to avoid blocking)
+        new Thread(() -> {
+            try {
+                // Wait a bit to let collection load
+                Thread.sleep(1000);
+                schnerry.seymouranalyzer.data.ChecklistCacheGenerator.generateAllCaches();
+            } catch (Exception e) {
+                Seymouranalyzer.LOGGER.error("Failed to generate initial checklist cache", e);
+            }
+        }, "ChecklistCacheInitializer").start();
+
         // Register keybindings (Press O to open GUI)
         KeyBindings.register();
         Seymouranalyzer.LOGGER.info("Registered keybindings");

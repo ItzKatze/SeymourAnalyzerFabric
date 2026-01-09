@@ -517,9 +517,7 @@ public class ChestScanner {
         return cleanName.contains("Velvet Top Hat") ||
                cleanName.contains("Cashmere Jacket") ||
                cleanName.contains("Satin Trousers") ||
-               cleanName.contains("Oxford Shoes") ||
-               cleanName.contains("Rotten") || // Rotten set
-               cleanName.contains("Zombie Lord"); // Any other museum pieces
+               cleanName.contains("Oxford Shoes");
     }
 
     /**

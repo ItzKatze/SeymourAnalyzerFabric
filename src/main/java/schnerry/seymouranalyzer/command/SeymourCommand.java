@@ -16,6 +16,9 @@ import schnerry.seymouranalyzer.data.ColorDatabase;
 import schnerry.seymouranalyzer.gui.*;
 import schnerry.seymouranalyzer.util.ColorMath;
 
+import java.util.ArrayList;
+import java.util.List;
+
 import static net.fabricmc.fabric.api.client.command.v2.ClientCommandManager.*;
 
 /**
@@ -123,6 +126,10 @@ public class SeymourCommand {
             .then(literal("config")
                 .executes(SeymourCommand::openConfigGUI))
 
+            // /seymour priorities - open priority editor GUI
+            .then(literal("priorities")
+                .executes(SeymourCommand::openPriorityEditorGUI))
+
             // /seymour search <hex> - search for pieces with specific hex code
             // /seymour search clear - clear search highlights
             .then(literal("search")
@@ -131,6 +138,11 @@ public class SeymourCommand {
                     .executes(SeymourCommand::clearSearch))
                 .then(argument("hex", StringArgumentType.greedyString())
                     .executes(SeymourCommand::searchPieces)))
+
+            // /seymour compare <hexes> - compare multiple hex codes
+            .then(literal("compare")
+                .then(argument("hexes", StringArgumentType.greedyString())
+                    .executes(SeymourCommand::compareHexes)))
 
             // /seymour debug - log all data from next hovered item
             .then(literal("debug")
@@ -155,8 +167,11 @@ public class SeymourCommand {
         ctx.getSource().sendFeedback(Text.literal("§a§l[Seymour Analyzer] §7Commands:"));
         ctx.getSource().sendFeedback(Text.literal("§f/seymour §7- Show this help menu"));
         ctx.getSource().sendFeedback(Text.literal("§b/seymour config §7- Open config GUI (or press I)"));
+        ctx.getSource().sendFeedback(Text.literal("§b/seymour priorities §7- Edit match priority order"));
         ctx.getSource().sendFeedback(Text.literal("§e/seymour list §7- List all custom colors"));
         ctx.getSource().sendFeedback(Text.literal("§e/seymour word list §7- List all custom words"));
+        ctx.getSource().sendFeedback(Text.literal("§2/seymour search <hexes> §7- Highlight chests with hex codes"));
+        ctx.getSource().sendFeedback(Text.literal("§8/seymour compare <hexes> §7- Compare multiple hex codes"));
         ctx.getSource().sendFeedback(Text.literal("§2/seymour toggle <option> §7- Toggle settings"));
         ctx.getSource().sendFeedback(Text.literal("§4/seymour clear §7- Clear all caches & collection"));
         ctx.getSource().sendFeedback(Text.literal("§8/seymour stats §7- Print the amount of T1/T2/Dupes"));
@@ -244,21 +259,28 @@ public class SeymourCommand {
     }
 
     private static int showToggleHelp(CommandContext<FabricClientCommandSource> ctx) {
+        schnerry.seymouranalyzer.config.ClothConfig config = schnerry.seymouranalyzer.config.ClothConfig.getInstance();
+
         ctx.getSource().sendFeedback(Text.literal("§c[Seymour] §7Usage: §f/seymour toggle <option>"));
-        ctx.getSource().sendFeedback(Text.literal("§7Available options:"));
-        ctx.getSource().sendFeedback(Text.literal("  §einfobox §8- Toggle info box display"));
-        ctx.getSource().sendFeedback(Text.literal("  §ehighlights §8- Toggle item slot highlights"));
-        ctx.getSource().sendFeedback(Text.literal("  §efade §8- Toggle fade dye matching"));
-        ctx.getSource().sendFeedback(Text.literal("  §e3p §8- Toggle 3-piece sets filter"));
-        ctx.getSource().sendFeedback(Text.literal("  §esets §8- Toggle piece-specific matching"));
-        ctx.getSource().sendFeedback(Text.literal("  §ewords §8- Toggle word highlights"));
-        ctx.getSource().sendFeedback(Text.literal("  §epattern §8- Toggle pattern highlights"));
-        ctx.getSource().sendFeedback(Text.literal("  §ecustom §8- Toggle custom colors"));
-        ctx.getSource().sendFeedback(Text.literal("  §edupes §8- Toggle dupe highlights"));
-        ctx.getSource().sendFeedback(Text.literal("  §ehighfades §8- Toggle high fade matches (T2+)"));
-        ctx.getSource().sendFeedback(Text.literal("  §eitemframes §8- Toggle item frame scanning"));
-        ctx.getSource().sendFeedback(Text.literal("  §ehextooltip §8- Toggle hex tooltip display"));
+        ctx.getSource().sendFeedback(Text.literal("§7Available options (§a✓§7 = enabled, §c✗§7 = disabled):"));
+
+        ctx.getSource().sendFeedback(Text.literal("  §einfobox §8- " + getToggleIndicator(config.isInfoBoxEnabled()) + " §7Toggle info box display"));
+        ctx.getSource().sendFeedback(Text.literal("  §ehighlights §8- " + getToggleIndicator(config.isHighlightsEnabled()) + " §7Toggle item slot highlights"));
+        ctx.getSource().sendFeedback(Text.literal("  §efade §8- " + getToggleIndicator(config.isFadeDyesEnabled()) + " §7Toggle fade dye matching"));
+        ctx.getSource().sendFeedback(Text.literal("  §e3p §8- " + getToggleIndicator(config.isThreePieceSetsEnabled()) + " §7Toggle 3-piece sets filter"));
+        ctx.getSource().sendFeedback(Text.literal("  §esets §8- " + getToggleIndicator(config.isPieceSpecificEnabled()) + " §7Toggle piece-specific matching"));
+        ctx.getSource().sendFeedback(Text.literal("  §ewords §8- " + getToggleIndicator(config.isWordsEnabled()) + " §7Toggle word highlights"));
+        ctx.getSource().sendFeedback(Text.literal("  §epattern §8- " + getToggleIndicator(config.isPatternsEnabled()) + " §7Toggle pattern highlights"));
+        ctx.getSource().sendFeedback(Text.literal("  §ecustom §8- " + getToggleIndicator(config.isCustomColorsEnabled()) + " §7Toggle custom colors"));
+        ctx.getSource().sendFeedback(Text.literal("  §edupes §8- " + getToggleIndicator(config.isDupesEnabled()) + " §7Toggle dupe highlights"));
+        ctx.getSource().sendFeedback(Text.literal("  §ehighfades §8- " + getToggleIndicator(config.isShowHighFades()) + " §7Toggle high fade matches (T2+)"));
+        ctx.getSource().sendFeedback(Text.literal("  §eitemframes §8- " + getToggleIndicator(config.isItemFramesEnabled()) + " §7Toggle item frame scanning"));
+        ctx.getSource().sendFeedback(Text.literal("  §ehextooltip §8- " + getToggleIndicator(schnerry.seymouranalyzer.render.HexTooltipRenderer.getInstance().isEnabled()) + " §7Toggle hex tooltip display"));
         return 0;
+    }
+
+    private static String getToggleIndicator(boolean enabled) {
+        return enabled ? "§a✓" : "§c✗";
     }
 
     private static int showScanHelp(CommandContext<FabricClientCommandSource> ctx) {
@@ -397,6 +419,15 @@ public class SeymourCommand {
         }
 
         ModConfig config = ModConfig.getInstance();
+
+        // Check if word already exists
+        if (config.getWordList().containsKey(word)) {
+            String existingPattern = config.getWordList().get(word);
+            ctx.getSource().sendError(Text.literal("§c[Seymour] §7Word '§d" + word + "§7' already exists with pattern '§f" + existingPattern + "§7'!"));
+            ctx.getSource().sendFeedback(Text.literal("§7Use §f/seymour word remove " + word + "§7 first to replace it."));
+            return 0;
+        }
+
         config.getWordList().put(word, pattern);
         config.saveData();
 
@@ -637,15 +668,20 @@ public class SeymourCommand {
                 pretty.append("\n");
             }
 
-            // Copy to clipboard
-            java.awt.datatransfer.StringSelection selection = new java.awt.datatransfer.StringSelection(pretty.toString());
-            java.awt.Toolkit.getDefaultToolkit().getSystemClipboard().setContents(selection, null);
+            // Copy to clipboard using GLFW (Minecraft's clipboard system)
+            net.minecraft.client.MinecraftClient mc = net.minecraft.client.MinecraftClient.getInstance();
+            mc.keyboard.setClipboard(pretty.toString());
 
             ctx.getSource().sendFeedback(Text.literal("§a[Seymour Analyzer] §7Exported §e" +
                 exportCollection.size() + "§7 pieces to clipboard!"));
 
         } catch (Exception e) {
-            ctx.getSource().sendError(Text.literal("§c[Seymour] Failed to copy export to clipboard: " + e.getMessage()));
+            String errorMsg = e.getMessage();
+            if (errorMsg == null || errorMsg.isEmpty()) {
+                errorMsg = e.getClass().getSimpleName() + " - check console for details";
+            }
+            ctx.getSource().sendError(Text.literal("§c[Seymour] Failed to copy export to clipboard: " + errorMsg));
+            schnerry.seymouranalyzer.Seymouranalyzer.LOGGER.error("Clipboard export failed", e);
         }
 
         return 1;
@@ -734,6 +770,18 @@ public class SeymourCommand {
             net.minecraft.client.MinecraftClient mc = net.minecraft.client.MinecraftClient.getInstance();
             mc.send(() -> mc.setScreen(schnerry.seymouranalyzer.config.ConfigScreen.createConfigScreen(null)));
             ctx.getSource().sendFeedback(Text.literal("§a[Seymour] §7Config GUI opened!"));
+        } catch (Exception e) {
+            ctx.getSource().sendError(Text.literal("§c[Seymour] §7Error: " + e.getMessage()));
+            e.printStackTrace();
+        }
+        return 1;
+    }
+
+    private static int openPriorityEditorGUI(CommandContext<FabricClientCommandSource> ctx) {
+        try {
+            net.minecraft.client.MinecraftClient mc = net.minecraft.client.MinecraftClient.getInstance();
+            mc.send(() -> mc.setScreen(new schnerry.seymouranalyzer.config.PriorityEditorScreen(null)));
+            ctx.getSource().sendFeedback(Text.literal("§a[Seymour] §7Priority Editor opened!"));
         } catch (Exception e) {
             ctx.getSource().sendError(Text.literal("§c[Seymour] §7Error: " + e.getMessage()));
             e.printStackTrace();
@@ -1111,6 +1159,100 @@ public class SeymourCommand {
                 e.printStackTrace();
             }
         }).start();
+
+        return 1;
+    }
+
+    private static int compareHexes(CommandContext<FabricClientCommandSource> ctx) {
+        String input = StringArgumentType.getString(ctx, "hexes");
+        String[] parts = input.split("\\s+");
+
+        List<String> validHexes = new ArrayList<>();
+
+        // Parse and validate hex codes
+        for (String part : parts) {
+            String hex = part.replace("#", "").toUpperCase().trim();
+            if (hex.length() == 6 && hex.matches("[0-9A-F]{6}")) {
+                validHexes.add(hex);
+            } else if (!hex.isEmpty()) {
+                ctx.getSource().sendError(Text.literal("§c[Seymour] §7Invalid hex code: §f" + part));
+            }
+        }
+
+        if (validHexes.size() < 2) {
+            ctx.getSource().sendError(Text.literal("§c[Seymour] §7Please provide at least 2 valid hex codes!"));
+            ctx.getSource().sendFeedback(Text.literal("§7Usage: §e/seymour compare <hex1> <hex2> [hex3] ..."));
+            ctx.getSource().sendFeedback(Text.literal("§7Example: §e/seymour compare FF0000 00FF00 0000FF"));
+            return 0;
+        }
+
+        // Parse RGB values
+        List<int[]> rgbValues = new ArrayList<>();
+        for (String hex : validHexes) {
+            int rgb = Integer.parseInt(hex, 16);
+            int r = (rgb >> 16) & 0xFF;
+            int g = (rgb >> 8) & 0xFF;
+            int b = rgb & 0xFF;
+            rgbValues.add(new int[]{r, g, b});
+        }
+
+        // Calculate average color
+        int totalR = 0, totalG = 0, totalB = 0;
+        for (int[] rgb : rgbValues) {
+            totalR += rgb[0];
+            totalG += rgb[1];
+            totalB += rgb[2];
+        }
+
+        int avgR = totalR / validHexes.size();
+        int avgG = totalG / validHexes.size();
+        int avgB = totalB / validHexes.size();
+
+        String avgHex = String.format("%02X%02X%02X", avgR, avgG, avgB);
+
+        // Calculate average absolute distance (RGB distance)
+        double totalAbsoluteDiff = 0;
+        int pairCount = 0;
+        for (int i = 0; i < rgbValues.size(); i++) {
+            for (int j = i + 1; j < rgbValues.size(); j++) {
+                int[] rgb1 = rgbValues.get(i);
+                int[] rgb2 = rgbValues.get(j);
+                totalAbsoluteDiff += Math.abs(rgb1[0] - rgb2[0]) + Math.abs(rgb1[1] - rgb2[1]) + Math.abs(rgb1[2] - rgb2[2]);
+                pairCount++;
+            }
+        }
+        double avgAbsoluteDiff = pairCount > 0 ? totalAbsoluteDiff / pairCount : 0;
+
+        // Calculate average Delta E (visual distance)
+        double totalDeltaE = 0;
+        pairCount = 0;
+        for (int i = 0; i < validHexes.size(); i++) {
+            for (int j = i + 1; j < validHexes.size(); j++) {
+                double deltaE = ColorMath.calculateDeltaE(validHexes.get(i), validHexes.get(j));
+                totalDeltaE += deltaE;
+                pairCount++;
+            }
+        }
+        double avgDeltaE = pairCount > 0 ? totalDeltaE / pairCount : 0;
+
+        // Output results
+        ctx.getSource().sendFeedback(Text.literal("§8§m----------------------------------------------------"));
+        ctx.getSource().sendFeedback(Text.literal("§a§lSeymour Analyzer §7- Color Comparison"));
+        ctx.getSource().sendFeedback(Text.literal("§7Comparing §e" + validHexes.size() + " §7colors"));
+
+        for (int i = 0; i < validHexes.size(); i++) {
+            ctx.getSource().sendFeedback(Text.literal("  §7" + (i + 1) + ". §f#" + validHexes.get(i)));
+        }
+
+        ctx.getSource().sendFeedback(Text.literal(""));
+        ctx.getSource().sendFeedback(Text.literal("§e§lAverage Color"));
+        ctx.getSource().sendFeedback(Text.literal("  §7Hex: §f#" + avgHex));
+        ctx.getSource().sendFeedback(Text.literal("  §7Red=" + avgR + " §7Green=" + avgG + " §7Blue=" + avgB));
+        ctx.getSource().sendFeedback(Text.literal(""));
+        ctx.getSource().sendFeedback(Text.literal("§e§lAverage Differences"));
+        ctx.getSource().sendFeedback(Text.literal("  §7Absolute Distance: §f" + String.format("%.2f", avgAbsoluteDiff)));
+        ctx.getSource().sendFeedback(Text.literal("  §7Visual Distance (ΔE): §f" + String.format("%.2f", avgDeltaE)));
+        ctx.getSource().sendFeedback(Text.literal("§8§m----------------------------------------------------"));
 
         return 1;
     }

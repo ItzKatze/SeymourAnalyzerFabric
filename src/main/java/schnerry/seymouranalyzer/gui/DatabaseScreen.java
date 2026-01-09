@@ -159,6 +159,9 @@ public class DatabaseScreen extends ModScreen {
             hexSearchField.setText(pendingHexSearch);
             this.setFocused(hexSearchField);
             hexSearchField.setFocused(true);
+            // Automatically sort by distance (closest) when opening with hex search
+            sortColumn = "distance";
+            sortAscending = true;
             pendingHexSearch = null;
         }
         // Apply pending initial search if set (from command argument)
@@ -171,6 +174,9 @@ public class DatabaseScreen extends ModScreen {
                 hexSearchField.setText(search);
                 this.setFocused(hexSearchField);
                 hexSearchField.setFocused(true);
+                // Automatically sort by distance (closest) when opening with hex search
+                sortColumn = "distance";
+                sortAscending = true;
             } else {
                 // Everything else goes to main search field
                 searchField.setText(pendingInitialSearch);
@@ -879,7 +885,9 @@ public class DatabaseScreen extends ModScreen {
 
         // Apply hex search filter (only with exactly 6 hex digits)
         String hexSearchText = hexSearchField != null ? hexSearchField.getText().toUpperCase().replace("#", "") : "";
-        if (hexSearchText.length() == 6 && hexSearchText.matches("[0-9A-F]{6}")) {
+        boolean hasActiveHexSearch = hexSearchText.length() == 6 && hexSearchText.matches("[0-9A-F]{6}");
+
+        if (hasActiveHexSearch) {
             final String searchHex = hexSearchText;
             result = result.stream()
                 .filter(piece -> {
@@ -896,6 +904,10 @@ public class DatabaseScreen extends ModScreen {
                     return piece.getCachedSearchDeltaE() <= 5.0;
                 })
                 .collect(Collectors.toList());
+
+            // Automatically sort by distance when hex search is active
+            sortColumn = "distance";
+            sortAscending = true;
         }
 
         // Apply sorting

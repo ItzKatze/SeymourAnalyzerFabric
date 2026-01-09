@@ -3,6 +3,7 @@ package schnerry.seymouranalyzer.config;
 import me.shedaniel.clothconfig2.api.ConfigBuilder;
 import me.shedaniel.clothconfig2.api.ConfigCategory;
 import me.shedaniel.clothconfig2.api.ConfigEntryBuilder;
+import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.gui.screen.Screen;
 import net.minecraft.text.Text;
 
@@ -31,6 +32,7 @@ public class ConfigScreen {
                 .setTooltip(Text.literal("Show detailed color analysis info box when hovering items"))
                 .setSaveConsumer(config::setInfoBoxEnabled)
                 .build());
+
 
         analysisCategory.addEntry(entryBuilder.startBooleanToggle(
                 Text.literal("Item Highlights"),
@@ -63,6 +65,24 @@ public class ConfigScreen {
                 .setTooltip(Text.literal("Warn when you have duplicate colors in your collection"))
                 .setSaveConsumer(config::setDupesEnabled)
                 .build());
+
+        // Match Priority Editor - Create a subcategory
+        ConfigCategory priorityCategory = builder.getOrCreateCategory(Text.literal("Match Priorities"));
+
+        priorityCategory.addEntry(entryBuilder.startTextDescription(
+                Text.literal("§7Configure which match types take priority for highlights.\n§7Drag items to reorder - higher = priority.")
+        ).build());
+
+        // Current priority order display
+        StringBuilder priorityDisplay = new StringBuilder("§eCurrent Order:\n");
+        for (int i = 0; i < config.getMatchPriorities().size(); i++) {
+            MatchPriority priority = config.getMatchPriorities().get(i);
+            priorityDisplay.append("§7").append(i + 1).append(". §f").append(priority.getDisplayName()).append("\n");
+        }
+
+        priorityCategory.addEntry(entryBuilder.startTextDescription(
+                Text.literal(priorityDisplay.toString())
+        ).build());
 
         // Filter Options Category
         ConfigCategory filterCategory = builder.getOrCreateCategory(Text.literal("Filter Options"));

@@ -106,6 +106,13 @@ public class ItemSlotHighlighter {
     }
 
     /**
+     * Clear the item cache (used when priorities or config changes)
+     */
+    public void clearCache() {
+        itemCache.clear();
+    }
+
+    /**
      * Render highlight for a single slot (called by mixin)
      * This method is called during slot rendering, so it's in the correct coordinate space
      */
@@ -402,71 +409,113 @@ public class ItemSlotHighlighter {
     }
 
     /**
-     * Determine highlight color based on item properties
+     * Determine highlight color based on item properties using the priority system
      * Returns null if no highlight should be drawn
      */
     private Integer getHighlightColor(ItemStack stack, String hex, String itemName, String uuid) {
         ModConfig config = ModConfig.getInstance();
+        schnerry.seymouranalyzer.config.ClothConfig clothConfig = schnerry.seymouranalyzer.config.ClothConfig.getInstance();
         String hexUpper = hex.toUpperCase();
 
+        // Collect all possible matches with their priorities
+        java.util.Map<schnerry.seymouranalyzer.config.MatchPriority, Integer> possibleMatches = new java.util.HashMap<>();
 
-        // Priority 1: Dupe check
-        if (config.dupesEnabled() && uuid != null) {
-            if (isDuplicateHex(hex, uuid)) {
-                return COLOR_DUPE;
-            }
+        // Check dupe
+        if (config.dupesEnabled() && uuid != null && isDuplicateHex(hex, uuid)) {
+            possibleMatches.put(schnerry.seymouranalyzer.config.MatchPriority.DUPE, COLOR_DUPE);
         }
 
-        // Priority 2: Search match
+        // Check search match
         if (!searchHexes.isEmpty() && searchHexes.contains(hexUpper)) {
-            return COLOR_SEARCH;
+            possibleMatches.put(schnerry.seymouranalyzer.config.MatchPriority.SEARCH, COLOR_SEARCH);
         }
 
-        // Priority 3: Word match
+        // Check word match
         if (config.wordsEnabled()) {
             String wordMatch = PatternDetector.getInstance().detectWordMatch(hex);
             if (wordMatch != null) {
-                return COLOR_WORD;
+                possibleMatches.put(schnerry.seymouranalyzer.config.MatchPriority.WORD, COLOR_WORD);
             }
         }
 
-        // Priority 4: Pattern match
+        // Check pattern match
         if (config.patternsEnabled()) {
             String pattern = PatternDetector.getInstance().detectPattern(hex);
             if (pattern != null) {
-                return COLOR_PATTERN;
+                possibleMatches.put(schnerry.seymouranalyzer.config.MatchPriority.PATTERN, COLOR_PATTERN);
             }
         }
 
-        // Priority 5: Tier-based coloring
+        // Check tier-based matches - check ALL top 3 matches, not just the best one
+        // A piece can match multiple categories (e.g., T1 fade AND T2 normal)
         var analysis = ColorAnalyzer.getInstance().analyzeArmorColor(hex, itemName);
-        if (analysis == null || analysis.tier == 3) return null; // T3 = no highlight
+        if (analysis != null && analysis.top3Matches != null) {
+            for (var match : analysis.top3Matches) {
+                int tier = calculateTier(match.deltaE, match.isCustom, match.isFade);
 
-        boolean isCustom = analysis.bestMatch != null && config.getCustomColors().containsKey(analysis.bestMatch.name);
-        boolean isFade = analysis.bestMatch != null && analysis.bestMatch.isFade;
+                // Skip T3+ matches (too far away)
+                if (tier == 3) continue;
 
-        if (isCustom) {
-            return switch (analysis.tier) {
-                case 0 -> COLOR_CUSTOM_T0;
-                case 1 -> COLOR_CUSTOM_T1;
-                case 2 -> COLOR_CUSTOM_T2;
-                default -> null;
-            };
-        } else if (isFade) {
-            return switch (analysis.tier) {
-                case 0 -> COLOR_FADE_T0;
-                case 1 -> COLOR_FADE_T1;
-                case 2 -> COLOR_FADE_T2;
-                default -> null;
-            };
-        } else {
-            return switch (analysis.tier) {
-                case 0 -> COLOR_NORMAL_T0;
-                case 1 -> COLOR_NORMAL_T1;
-                case 2 -> COLOR_NORMAL_T2;
-                default -> null;
-            };
+                if (match.isCustom) {
+                    switch (tier) {
+                        case 1 -> possibleMatches.putIfAbsent(schnerry.seymouranalyzer.config.MatchPriority.CUSTOM_T1, COLOR_CUSTOM_T1);
+                        case 2 -> possibleMatches.putIfAbsent(schnerry.seymouranalyzer.config.MatchPriority.CUSTOM_T2, COLOR_CUSTOM_T2);
+                    }
+                } else if (match.isFade) {
+                    switch (tier) {
+                        case 0 -> possibleMatches.putIfAbsent(schnerry.seymouranalyzer.config.MatchPriority.FADE_T0, COLOR_FADE_T0);
+                        case 1 -> possibleMatches.putIfAbsent(schnerry.seymouranalyzer.config.MatchPriority.FADE_T1, COLOR_FADE_T1);
+                        case 2 -> possibleMatches.putIfAbsent(schnerry.seymouranalyzer.config.MatchPriority.FADE_T2, COLOR_FADE_T2);
+                    }
+                } else {
+                    switch (tier) {
+                        case 0 -> possibleMatches.putIfAbsent(schnerry.seymouranalyzer.config.MatchPriority.NORMAL_T0, COLOR_NORMAL_T0);
+                        case 1 -> possibleMatches.putIfAbsent(schnerry.seymouranalyzer.config.MatchPriority.NORMAL_T1, COLOR_NORMAL_T1);
+                        case 2 -> possibleMatches.putIfAbsent(schnerry.seymouranalyzer.config.MatchPriority.NORMAL_T2, COLOR_NORMAL_T2);
+                    }
+                }
+            }
         }
+
+        // If no matches, return null
+        if (possibleMatches.isEmpty()) {
+            return null;
+        }
+
+        // Find the highest priority match based on user's priority order
+        java.util.List<schnerry.seymouranalyzer.config.MatchPriority> priorities = clothConfig.getMatchPriorities();
+        for (schnerry.seymouranalyzer.config.MatchPriority priority : priorities) {
+            if (possibleMatches.containsKey(priority)) {
+                return possibleMatches.get(priority);
+            }
+        }
+
+        // Fallback: return any match
+        return possibleMatches.values().iterator().next();
+    }
+
+    /**
+     * Calculate tier for a match (copied from ColorAnalyzer to avoid recalculation)
+     */
+    private int calculateTier(double deltaE, boolean isCustom, boolean isFade) {
+        if (isCustom) {
+            if (deltaE <= 2) return 1;
+            if (deltaE <= 5) return 2;
+            return 3;
+        }
+
+        if (isFade) {
+            if (deltaE <= 1) return 0;
+            if (deltaE <= 2) return 1;
+            if (deltaE <= 5) return 2;
+            return 3;
+        }
+
+        // Normal colors
+        if (deltaE <= 1) return 0;
+        if (deltaE <= 2) return 1;
+        if (deltaE <= 5) return 2;
+        return 3;
     }
 
     /**

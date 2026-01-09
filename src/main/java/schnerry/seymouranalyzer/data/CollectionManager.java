@@ -35,6 +35,7 @@ public class CollectionManager {
     private final AtomicBoolean isSaving = new AtomicBoolean(false);
     private long lastSaveTime = 0;
     private static final long SAVE_DEBOUNCE_MS = 2000; // Wait 2 seconds after last change before saving
+    private int lastCollectionSize = 0; // Track size to detect changes
 
     private CollectionManager() {
         File configDir = new File(FabricLoader.getInstance().getConfigDir().toFile(), "seymouranalyzer");
@@ -141,7 +142,7 @@ public class CollectionManager {
     }
 
     /**
-     * Check if collection should be auto-saved (called from tick)
+     * Called every tick to handle auto-save and cache regeneration
      */
     public void tick() {
         if (isDirty.get() && !isSaving.get()) {
@@ -149,6 +150,29 @@ public class CollectionManager {
             if (timeSinceLastChange >= SAVE_DEBOUNCE_MS) {
                 saveAsync();
             }
+        }
+
+        // Check if collection size changed and regenerate cache if needed
+        checkAndRegenerateCache();
+    }
+
+    /**
+     * Check if collection size changed and regenerate checklist cache if needed
+     */
+    private void checkAndRegenerateCache() {
+        int currentSize = collection.size();
+        if (currentSize != lastCollectionSize && currentSize > 0) {
+            lastCollectionSize = currentSize;
+
+            // Regenerate cache in background thread to avoid lag
+            new Thread(() -> {
+                try {
+                    Seymouranalyzer.LOGGER.info("Collection size changed to {}, regenerating checklist cache...", currentSize);
+                    ChecklistCacheGenerator.generateAllCaches();
+                } catch (Exception e) {
+                    Seymouranalyzer.LOGGER.error("Failed to regenerate checklist cache", e);
+                }
+            }, "ChecklistCacheRegenerator").start();
         }
     }
 

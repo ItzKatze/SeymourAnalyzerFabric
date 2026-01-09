@@ -221,6 +221,7 @@ public class InfoBoxRenderer {
 
     /**
      * Get checklist status for a target hex by checking the checklist cache
+     * Cache is now always generated on mod init and after collection changes
      * @param targetHex The target hex from analysis (what this piece matches to)
      * @param itemName The item name to determine piece type
      * @return ChecklistStatus with hasMatch (if assigned), isNeeded (if target), and tier of assigned match
