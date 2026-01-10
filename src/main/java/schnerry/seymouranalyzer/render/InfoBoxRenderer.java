@@ -393,6 +393,8 @@ public class InfoBoxRenderer {
     }
 
     private static int calculateBoxHeight(HoveredItemData data, boolean isShiftHeld) {
+        if (data == null) return 90; // Return default height if data is null
+
         ClothConfig config = ClothConfig.getInstance();
         int height = isShiftHeld ? 120 : 90;
 
@@ -410,6 +412,8 @@ public class InfoBoxRenderer {
     }
 
     private static int calculateBoxWidth(HoveredItemData data, MinecraftClient client, boolean isShiftHeld) {
+        if (data == null) return 150; // Return minimum width if data is null
+
         int maxWidth = 300;
         int minWidth = 150;
         int padding = 10; // 5px on each side
