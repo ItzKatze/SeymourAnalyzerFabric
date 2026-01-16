@@ -28,27 +28,60 @@ public class ColorAnalyzer {
 
     /**
      * Analyze an armor piece and find best color matches
+     *
+     * Strategy:
+     * 1. Collect matches from each category (customs, normals, fades) separately
+     * 2. Sort each category by deltaE
+     * 3. Take top 5 from each category to prevent any one category from crowding out others
+     * 4. Combine all selected matches and take top 10 by deltaE
+     * 5. Separate exact matches (always prioritized)
+     * 6. Apply user-defined priority order to non-exact matches
+     * 7. Return top 3 matches after prioritization
+     *
+     * This ensures that custom colors and normal colors aren't excluded when there are
+     * many fade dye matches, which was causing issues when showHighFades was enabled.
      */
     public AnalysisResult analyzeArmorColor(String hexcode, String pieceName) {
         ClothConfig config = ClothConfig.getInstance();
         String pieceType = detectPieceType(pieceName);
 
-        List<ColorMatch> allMatches = new ArrayList<>();
+        // Collect matches from each category separately to prevent one category from crowding out others
+        List<ColorMatch> customMatches = new ArrayList<>();
+        List<ColorMatch> normalMatches = new ArrayList<>();
+        List<ColorMatch> fadeMatches = new ArrayList<>();
 
         // Check custom colors first if enabled
         if (config.isCustomColorsEnabled()) {
-            allMatches.addAll(findMatchesInMap(hexcode, pieceType, config.getCustomColors(), true, false));
+            customMatches = findMatchesInMap(hexcode, pieceType, config.getCustomColors(), true, false);
+            customMatches.sort(Comparator.comparingDouble(m -> m.deltaE));
         }
 
         // Check target colors
-        allMatches.addAll(findMatchesInMap(hexcode, pieceType, colorDatabase.getTargetColors(), false, false));
+        normalMatches = findMatchesInMap(hexcode, pieceType, colorDatabase.getTargetColors(), false, false);
+        normalMatches.sort(Comparator.comparingDouble(m -> m.deltaE));
 
         // Check fade dyes if enabled
         if (config.isFadeDyesEnabled()) {
-            allMatches.addAll(findMatchesInMap(hexcode, pieceType, colorDatabase.getFadeDyes(), false, true));
+            fadeMatches = findMatchesInMap(hexcode, pieceType, colorDatabase.getFadeDyes(), false, true);
+
+            // Apply high fade filtering - only show T0/T1 fades (deltaE <= 2.0) when disabled
+            if (!config.isShowHighFades()) {
+                fadeMatches = fadeMatches.stream()
+                    .filter(m -> m.deltaE <= 2.0) // Only keep T0/T1 fades (deltaE <= 2.0)
+                    .collect(Collectors.toList());
+            }
+
+            fadeMatches.sort(Comparator.comparingDouble(m -> m.deltaE));
         }
 
-        // Step 1: Sort all matches by deltaE to get the 10 closest color matches
+        // Take top 5 from each category to prevent any single category from dominating
+        // This ensures customs and normals aren't crowded out by fades
+        List<ColorMatch> allMatches = new ArrayList<>();
+        allMatches.addAll(customMatches.stream().limit(5).collect(Collectors.toList()));
+        allMatches.addAll(normalMatches.stream().limit(5).collect(Collectors.toList()));
+        allMatches.addAll(fadeMatches.stream().limit(5).collect(Collectors.toList()));
+
+        // Step 1: Sort all selected matches by deltaE
         allMatches.sort(Comparator.comparingDouble(m -> m.deltaE));
 
         // Step 2: Take top 10 closest matches by deltaE
@@ -148,12 +181,7 @@ public class ColorAnalyzer {
             ColorMath.LAB targetLab = colorDatabase.getLabForHex(targetHex);
             double deltaE = ColorMath.calculateDeltaEWithLab(itemLab, targetLab);
 
-            // High fade filtering - only show T0/T1 fades (deltaE <= 2.0) when disabled
-            if (!config.isShowHighFades() && isFade && deltaE > 2.0) {
-                continue; // Skip fades with deltaE > 2.0 (T2+)
-            }
-
-            // Always add to matches (removed deltaE <= 5.0 filter to ensure we get top 3)
+            // Always add to matches - filtering is now done at the category level in analyzeArmorColor
             int absoluteDist = ColorMath.calculateAbsoluteDistance(itemHex, targetHex);
             int tier = calculateTier(deltaE, isCustom, isFade);
 

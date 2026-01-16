@@ -41,6 +41,10 @@ public class ClothConfig {
     // Toggle settings - Scanning
     private boolean itemFramesEnabled = false;
 
+    // InfoBox position
+    private int infoBoxX = 50;
+    private int infoBoxY = 80;
+
     // Match priorities - Higher in list = higher priority for highlights
     private java.util.List<MatchPriority> matchPriorities = getDefaultMatchPriorities();
 
@@ -83,6 +87,9 @@ public class ClothConfig {
                 if (json.has("dupesEnabled")) dupesEnabled = json.get("dupesEnabled").getAsBoolean();
                 if (json.has("showHighFades")) showHighFades = json.get("showHighFades").getAsBoolean();
                 if (json.has("itemFramesEnabled")) itemFramesEnabled = json.get("itemFramesEnabled").getAsBoolean();
+
+                if (json.has("infoBoxX")) infoBoxX = json.get("infoBoxX").getAsInt();
+                if (json.has("infoBoxY")) infoBoxY = json.get("infoBoxY").getAsInt();
 
                 if (json.has("matchPriorities")) {
                     matchPriorities = new java.util.ArrayList<>();
@@ -144,6 +151,9 @@ public class ClothConfig {
             json.addProperty("dupesEnabled", dupesEnabled);
             json.addProperty("showHighFades", showHighFades);
             json.addProperty("itemFramesEnabled", itemFramesEnabled);
+
+            json.addProperty("infoBoxX", infoBoxX);
+            json.addProperty("infoBoxY", infoBoxY);
 
             com.google.gson.JsonArray prioritiesArray = new com.google.gson.JsonArray();
             matchPriorities.forEach(priority -> prioritiesArray.add(priority.name()));
@@ -268,6 +278,23 @@ public class ClothConfig {
 
     public void setItemFramesEnabled(boolean itemFramesEnabled) {
         this.itemFramesEnabled = itemFramesEnabled;
+    }
+
+    // InfoBox Position
+    public int getInfoBoxX() {
+        return infoBoxX;
+    }
+
+    public void setInfoBoxX(int infoBoxX) {
+        this.infoBoxX = infoBoxX;
+    }
+
+    public int getInfoBoxY() {
+        return infoBoxY;
+    }
+
+    public void setInfoBoxY(int infoBoxY) {
+        this.infoBoxY = infoBoxY;
     }
 
     // Custom data

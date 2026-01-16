@@ -32,9 +32,19 @@ public class InfoBoxRenderer {
     public static void resetPosition() {
         boxX = 50;
         boxY = 80;
+        // Save to config
+        ClothConfig config = ClothConfig.getInstance();
+        config.setInfoBoxX(boxX);
+        config.setInfoBoxY(boxY);
+        config.save();
     }
 
     private InfoBoxRenderer() {
+        // Load position from config
+        ClothConfig config = ClothConfig.getInstance();
+        boxX = config.getInfoBoxX();
+        boxY = config.getInfoBoxY();
+
         // Register screen render callback to render AFTER screen elements
         ScreenEvents.AFTER_INIT.register((client, screen, scaledWidth, scaledHeight) ->
             ScreenEvents.afterRender(screen).register((scr, context, mouseX, mouseY, delta) ->
@@ -389,6 +399,11 @@ public class InfoBoxRenderer {
             boxY = (int)(mouseY - dragOffsetY);
         } else if (isDragging) {
             isDragging = false;
+            // Save position to config when dragging ends
+            ClothConfig config = ClothConfig.getInstance();
+            config.setInfoBoxX(boxX);
+            config.setInfoBoxY(boxY);
+            config.save();
         }
     }
 
@@ -591,12 +606,12 @@ public class InfoBoxRenderer {
                     yOffset += 10;
                 }
             }
-        }
 
-        // Dupe warning (after ownership check, properly positioned)
-        if (config.isDupesEnabled() && hoveredItemData.dupeCount > 0) {
-            context.drawText(client.textRenderer, Text.literal("§c§l⚠ DUPE HEX §7(x" + hoveredItemData.dupeCount + ")"),
-                boxX + 5, boxY + yOffset, 0xFFFFFFFF, true);
+            // Dupe warning (only show when NOT holding shift)
+            if (config.isDupesEnabled() && hoveredItemData.dupeCount > 0) {
+                context.drawText(client.textRenderer, Text.literal("§c§l⚠ DUPE HEX §7(x" + hoveredItemData.dupeCount + ")"),
+                    boxX + 5, boxY + yOffset, 0xFFFFFFFF, true);
+            }
         }
     }
 

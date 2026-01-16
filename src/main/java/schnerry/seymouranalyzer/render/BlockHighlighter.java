@@ -81,20 +81,8 @@ public class BlockHighlighter {
             drawBoxOutline(consumer, positionMatrix, pos, red, green, blue, alpha);
         }
 
-        // Flush the buffer with depth test disabled so it renders through walls
-        // Save current state
-        boolean depthEnabled = GL11.glIsEnabled(GL11.GL_DEPTH_TEST);
-
-        // Disable depth test before drawing
-        GL11.glDisable(GL11.GL_DEPTH_TEST);
-
         // Force draw the buffered vertices
         immediate.draw(RenderLayer.getLines());
-
-        // Restore depth test state
-        if (depthEnabled) {
-            GL11.glEnable(GL11.GL_DEPTH_TEST);
-        }
 
         matrices.pop();
     }

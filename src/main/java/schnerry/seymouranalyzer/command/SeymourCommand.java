@@ -170,6 +170,8 @@ public class SeymourCommand {
         ctx.getSource().sendFeedback(Text.literal("§b/seymour priorities §7- Edit match priority order"));
         ctx.getSource().sendFeedback(Text.literal("§e/seymour list §7- List all custom colors"));
         ctx.getSource().sendFeedback(Text.literal("§e/seymour word list §7- List all custom words"));
+        ctx.getSource().sendFeedback(Text.literal("§2/seymour scan start/stop §7- Start/stop chest scanning"));
+        ctx.getSource().sendFeedback(Text.literal("§2/seymour export start/stop §7- Start/stop clipboard export"));
         ctx.getSource().sendFeedback(Text.literal("§2/seymour search <hexes> §7- Highlight chests with hex codes"));
         ctx.getSource().sendFeedback(Text.literal("§8/seymour compare <hexes> §7- Compare multiple hex codes"));
         ctx.getSource().sendFeedback(Text.literal("§2/seymour toggle <option> §7- Toggle settings"));
