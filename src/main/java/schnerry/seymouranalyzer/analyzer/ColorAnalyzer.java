@@ -26,7 +26,7 @@ public class ColorAnalyzer {
 
     /**
      * Analyze an armor piece and find best color matches
-     *
+     * <p>
      * Strategy:
      * 1. Collect matches from each category (customs, normals, fades) separately
      * 2. Sort each category by deltaE

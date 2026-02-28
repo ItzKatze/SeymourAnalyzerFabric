@@ -1,6 +1,6 @@
 # Seymour Analyzer - Fabric Mod
 
-A Fabric 1.21.11 Java 25 client-side mod for Hypixel Skyblock that analyzes and tracks dyed leather armor colors in Hypixel Skyblock.
+A Fabric 1.21.11 client-side mod for Hypixel Skyblock that analyzes and tracks dyed leather armor colors in Hypixel Skyblock.
 
 **License:** GPL-3.0-or-later
 
