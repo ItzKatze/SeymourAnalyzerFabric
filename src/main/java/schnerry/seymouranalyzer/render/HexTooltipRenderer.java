@@ -1,5 +1,7 @@
 package schnerry.seymouranalyzer.render;
 
+import lombok.Getter;
+import lombok.Setter;
 import net.fabricmc.fabric.api.client.item.v1.ItemTooltipCallback;
 import net.minecraft.component.DataComponentTypes;
 import net.minecraft.component.type.DyedColorComponent;
@@ -9,7 +11,10 @@ import net.minecraft.item.tooltip.TooltipType;
 import net.minecraft.nbt.NbtCompound;
 import net.minecraft.text.MutableText;
 import net.minecraft.text.Text;
+import schnerry.seymouranalyzer.analyzer.ColorAnalyzer;
 import schnerry.seymouranalyzer.scanner.ChestScanner;
+import schnerry.seymouranalyzer.util.ItemStackUtils;
+import schnerry.seymouranalyzer.util.StringUtility;
 
 import java.util.List;
 
@@ -20,6 +25,8 @@ import java.util.List;
  */
 public class HexTooltipRenderer {
     private static HexTooltipRenderer instance;
+    @Getter
+    @Setter
     private boolean enabled = true;
 
     private HexTooltipRenderer() {
@@ -34,14 +41,6 @@ public class HexTooltipRenderer {
             instance = new HexTooltipRenderer();
         }
         return instance;
-    }
-
-    public void setEnabled(boolean enabled) {
-        this.enabled = enabled;
-    }
-
-    public boolean isEnabled() {
-        return enabled;
     }
 
     /**
@@ -66,14 +65,14 @@ public class HexTooltipRenderer {
         } else {
             // Not dyed: extract hex normally and use it for both
             ChestScanner scanner = new ChestScanner();
-            displayHex = scanner.extractHex(stack);
+            displayHex = ItemStackUtils.extractHex(stack);
             hexForAnalysis = displayHex;
         }
 
         if (displayHex == null) return;
 
         String itemName = stack.getName().getString();
-        boolean isSeymourArmor = ChestScanner.isSeymourArmor(itemName);
+        boolean isSeymourArmor = StringUtility.isSeymourArmor(itemName);
 
         // Parse hex to RGB for coloring the text
         int rgb = hexToRgb(displayHex);
@@ -99,16 +98,16 @@ public class HexTooltipRenderer {
             // Use original hex for analysis (so closest match is based on original color)
 
             // Analyze color to get closest match
-            var analysis = schnerry.seymouranalyzer.analyzer.ColorAnalyzer.getInstance().analyzeArmorColor(hexForAnalysis, itemName);
+            var analysis = ColorAnalyzer.getInstance().analyzeArmorColor(hexForAnalysis, itemName);
 
             // Add second line with closest match and deltaE if analysis succeeded
-            if (analysis != null && analysis.bestMatch != null) {
-                String matchName = analysis.bestMatch.name;
-                double deltaE = analysis.bestMatch.deltaE;
+            if (analysis != null && analysis.bestMatch() != null) {
+                String matchName = analysis.bestMatch().name();
+                double deltaE = analysis.bestMatch().deltaE();
 
                 // Determine closeness color based on deltaE
-                int closenessColor = getClosenessColor(deltaE, analysis.tier, analysis.bestMatch.isFade,
-                    analysis.bestMatch.isCustom);
+                int closenessColor = getClosenessColor(deltaE, analysis.tier(), analysis.bestMatch().isFade(),
+                        analysis.bestMatch().isCustom());
 
                 // Build the second line: "Closest: Match Name - ΔE"
                 MutableText closestText = Text.literal("Closest: ")

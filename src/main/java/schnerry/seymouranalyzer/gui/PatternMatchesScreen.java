@@ -222,7 +222,7 @@ public class PatternMatchesScreen extends ModScreen {
 
         // Hex box
         ColorMath.RGB rgb = ColorMath.hexToRgb(row.piece.getHexcode());
-        int color = 0xFF000000 | (rgb.r << 16) | (rgb.g << 8) | rgb.b;
+        int color = 0xFF000000 | (rgb.r() << 16) | (rgb.g() << 8) | rgb.b();
         context.fill(580, y - 2, 665, y + 12, color);
 
         // Hex text - with alpha channel
@@ -264,7 +264,7 @@ public class PatternMatchesScreen extends ModScreen {
                 char c = entry.getKey().charAt(7);
                 String hex = String.valueOf(c).repeat(6);
                 ColorMath.RGB rgb = ColorMath.hexToRgb(hex);
-                int color = 0xFF000000 | (rgb.r << 16) | (rgb.g << 8) | rgb.b;
+                int color = 0xFF000000 | (rgb.r() << 16) | (rgb.g() << 8) | rgb.b();
                 context.fill(boxX + 10, currentY, boxX + 55, currentY + 10, color);
 
                 boolean isDark = ColorMath.isColorDark(hex);
@@ -279,9 +279,17 @@ public class PatternMatchesScreen extends ModScreen {
     }
 
     private String getPatternName(String patternType) {
-        if (patternType.equals("paired")) return "PAIRED";
-        if (patternType.equals("repeating")) return "REPEATING";
-        if (patternType.equals("palindrome")) return "PALINDROME";
+        switch (patternType) {
+            case "paired" -> {
+                return "PAIRED";
+            }
+            case "repeating" -> {
+                return "REPEATING";
+            }
+            case "palindrome" -> {
+                return "PALINDROME";
+            }
+        }
         if (patternType.startsWith("axbxcx_")) {
             char c = patternType.charAt(7);
             return c + "x" + c + "x" + c + "x";
@@ -290,9 +298,17 @@ public class PatternMatchesScreen extends ModScreen {
     }
 
     private String getPatternDescription(String patternType, String hex) {
-        if (patternType.equals("paired")) return "AABBCC";
-        if (patternType.equals("repeating")) return "ABCABC";
-        if (patternType.equals("palindrome")) return "ABCCBA";
+        switch (patternType) {
+            case "paired" -> {
+                return "AABBCC";
+            }
+            case "repeating" -> {
+                return "ABCABC";
+            }
+            case "palindrome" -> {
+                return "ABCCBA";
+            }
+        }
         if (patternType.startsWith("axbxcx_")) {
             char c = patternType.charAt(7);
             return c + "x" + c + "x" + c + "x";

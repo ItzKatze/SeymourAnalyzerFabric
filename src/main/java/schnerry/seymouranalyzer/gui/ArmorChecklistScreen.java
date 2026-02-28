@@ -856,9 +856,8 @@ public class ArmorChecklistScreen extends ModScreen {
 
             // Draw scrollbar
             int scrollbarX = this.width - 15;
-            int scrollbarY = START_Y;
             int scrollbarHeight = maxVisible * ROW_HEIGHT;
-            ScrollbarRenderer.renderVerticalScrollbar(context, scrollbarX, scrollbarY, scrollbarHeight,
+            ScrollbarRenderer.renderVerticalScrollbar(context, scrollbarX, START_Y, scrollbarHeight,
                 scrollOffset, entries.size(), maxVisible);
         }
     }
@@ -866,7 +865,7 @@ public class ArmorChecklistScreen extends ModScreen {
     private void drawChecklistRow(DrawContext context, ChecklistEntry entry, int y) {
         // Draw hex color box (50px wide to fit hex code)
         ColorMath.RGB rgb = ColorMath.hexToRgb(entry.hex);
-        int color = 0xFF000000 | (rgb.r << 16) | (rgb.g << 8) | rgb.b;
+        int color = 0xFF000000 | (rgb.r() << 16) | (rgb.g() << 8) | rgb.b();
         context.fill(20, y, 70, y + 20, color);
 
         // Draw hex text on the color box
@@ -1177,11 +1176,10 @@ public class ArmorChecklistScreen extends ModScreen {
             if (entries != null) {
                 int availableHeight = this.height - START_Y - 80;
                 int maxVisible = Math.max(1, availableHeight / ROW_HEIGHT);
-                int scrollbarY = START_Y;
                 int scrollbarHeight = maxVisible * ROW_HEIGHT;
 
                 int maxScroll = Math.max(0, entries.size() - maxVisible);
-                scrollOffset = ScrollbarRenderer.calculateScrollFromDrag(click.y(), scrollbarY, scrollbarHeight,
+                scrollOffset = ScrollbarRenderer.calculateScrollFromDrag(click.y(), START_Y, scrollbarHeight,
                     entries.size(), maxVisible);
                 scrollOffset = Math.max(0, Math.min(maxScroll, scrollOffset));
             }

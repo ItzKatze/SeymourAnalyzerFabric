@@ -163,13 +163,13 @@ public class BestSetsScreen extends ModScreen {
 
         // Draw color boxes
         context.fill(boxX, boxY, boxX + boxSize, boxY + boxSize,
-            0xFF000000 | (helmetRgb.r << 16) | (helmetRgb.g << 8) | helmetRgb.b);
+            0xFF000000 | (helmetRgb.r() << 16) | (helmetRgb.g() << 8) | helmetRgb.b());
         context.fill(boxX + boxSize, boxY, boxX + boxSize * 2, boxY + boxSize,
-            0xFF000000 | (chestRgb.r << 16) | (chestRgb.g << 8) | chestRgb.b);
+            0xFF000000 | (chestRgb.r() << 16) | (chestRgb.g() << 8) | chestRgb.b());
         context.fill(boxX, boxY + boxSize, boxX + boxSize, boxY + boxSize * 2,
-            0xFF000000 | (legsRgb.r << 16) | (legsRgb.g << 8) | legsRgb.b);
+            0xFF000000 | (legsRgb.r() << 16) | (legsRgb.g() << 8) | legsRgb.b());
         context.fill(boxX + boxSize, boxY + boxSize, boxX + boxSize * 2, boxY + boxSize * 2,
-            0xFF000000 | (bootsRgb.r << 16) | (bootsRgb.g << 8) | bootsRgb.b);
+            0xFF000000 | (bootsRgb.r() << 16) | (bootsRgb.g() << 8) | bootsRgb.b());
 
         // Border around 2x2 grid
         int totalBoxSize = boxSize * 2;

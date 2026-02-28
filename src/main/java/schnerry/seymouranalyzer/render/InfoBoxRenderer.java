@@ -3,6 +3,7 @@ package schnerry.seymouranalyzer.render;
 import net.fabricmc.fabric.api.client.screen.v1.ScreenEvents;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.gui.DrawContext;
+import net.minecraft.client.gui.screen.Screen;
 import net.minecraft.item.ItemStack;
 import net.minecraft.text.Text;
 import org.lwjgl.glfw.GLFW;
@@ -11,12 +12,11 @@ import schnerry.seymouranalyzer.analyzer.PatternDetector;
 import schnerry.seymouranalyzer.config.ClothConfig;
 import schnerry.seymouranalyzer.data.ChecklistCache;
 import schnerry.seymouranalyzer.data.CollectionManager;
-import schnerry.seymouranalyzer.scanner.ChestScanner;
+import schnerry.seymouranalyzer.util.ItemStackUtils;
+import schnerry.seymouranalyzer.util.StringUtility;
 
-/**
- * Renders info box showing detailed color analysis for hovered items
- * Exact port from ChatTriggers index.js
- */
+import java.util.Objects;
+
 public class InfoBoxRenderer {
     private static final boolean DEBUG = false; // Disable debugging
     private static InfoBoxRenderer instance;
@@ -72,7 +72,7 @@ public class InfoBoxRenderer {
         lastHoveredStack = stack.copy();
 
         // Check if it's a Seymour armor piece
-        if (ChestScanner.isSeymourArmor(itemName)) {
+        if (StringUtility.isSeymourArmor(itemName)) {
             if (DEBUG) System.out.println("[InfoBox] Is Seymour armor, analyzing...");
             setHoveredItemData(stack, itemName);
         } else {
@@ -152,7 +152,7 @@ public class InfoBoxRenderer {
     }
 
     @SuppressWarnings("unused") // delta is required by Fabric API callback signature
-    private static void render(DrawContext context, float delta, net.minecraft.client.gui.screen.Screen currentScreen) {
+    private static void render(DrawContext context, float delta, Screen currentScreen) {
         if (DEBUG) {
             System.out.println("[InfoBox] render() called");
             System.out.println("[InfoBox] Current screen instance: " + System.identityHashCode(currentScreen));
@@ -189,14 +189,13 @@ public class InfoBoxRenderer {
     }
 
     private static void setHoveredItemData(ItemStack stack, String itemName) {
-        ChestScanner scanner = new ChestScanner();
-        String hex = scanner.extractHex(stack);
+        String hex = ItemStackUtils.extractHex(stack);
         if (hex == null) return;
 
-        String uuid = scanner.getOrCreateItemUUID(stack);
+        String uuid = ItemStackUtils.getOrCreateItemUUID(stack);
 
         var analysis = ColorAnalyzer.getInstance().analyzeArmorColor(hex, itemName);
-        if (analysis == null || analysis.bestMatch == null) return;
+        if (analysis == null || analysis.bestMatch() == null) return;
 
         ClothConfig config = ClothConfig.getInstance();
 
@@ -204,23 +203,23 @@ public class InfoBoxRenderer {
         String specialPattern = config.isPatternsEnabled() ? PatternDetector.getInstance().detectPattern(hex) : null;
 
         int itemRgb = Integer.parseInt(hex, 16);
-        int targetRgb = Integer.parseInt(analysis.bestMatch.targetHex, 16);
+        int targetRgb = Integer.parseInt(analysis.bestMatch().targetHex(), 16);
         int absoluteDist = Math.abs(((itemRgb >> 16) & 0xFF) - ((targetRgb >> 16) & 0xFF)) +
                           Math.abs(((itemRgb >> 8) & 0xFF) - ((targetRgb >> 8) & 0xFF)) +
                           Math.abs((itemRgb & 0xFF) - (targetRgb & 0xFF));
 
         // Get checklist status from cache for the best match hex
-        ChecklistStatus checklistStatus = getChecklistStatusForHex(analysis.bestMatch.targetHex, itemName);
+        ChecklistStatus checklistStatus = getChecklistStatusForHex(analysis.bestMatch().targetHex(), itemName);
         int dupeCount = config.isDupesEnabled() ? checkDupeCount(hex, uuid) : 0;
 
         hoveredItemData = new HoveredItemData(
-            analysis.bestMatch.name,
-            analysis.bestMatch.targetHex,
-            analysis.bestMatch.deltaE,
+                analysis.bestMatch().name(),
+                analysis.bestMatch().targetHex(),
+                analysis.bestMatch().deltaE(),
             absoluteDist,
-            analysis.tier,
-            analysis.bestMatch.isFade,
-            config.getCustomColors().containsKey(analysis.bestMatch.name),
+                analysis.tier(),
+                analysis.bestMatch().isFade(),
+            config.getCustomColors().containsKey(analysis.bestMatch().name()),
             hex,
             analysis,
             wordMatch,
@@ -337,7 +336,7 @@ public class InfoBoxRenderer {
         // Analyze the matched piece to get its tier
         var analysis = ColorAnalyzer.getInstance().analyzeArmorColor(matchInfo.hex, matchInfo.name);
         if (analysis != null) {
-            return analysis.tier;
+            return analysis.tier();
         }
         return Integer.MAX_VALUE;
     }
@@ -353,7 +352,7 @@ public class InfoBoxRenderer {
                 dupeCount++;
 
                 // Check if the hovered item IS this collection piece
-                if (java.util.Objects.equals(uuid, entry.getKey())) {
+                if (Objects.equals(uuid, entry.getKey())) {
                     isThisItemInCollection = true;
                 }
             }
@@ -460,12 +459,12 @@ public class InfoBoxRenderer {
             // Top 3 matches
             maxTextWidth = Math.max(maxTextWidth, textRenderer.getWidth("§7§lTop 3 Matches:"));
 
-            var top3 = data.analysisResult.top3Matches;
+            var top3 = data.analysisResult.top3Matches();
             for (int i = 0; i < Math.min(3, top3.size()); i++) {
                 var match = top3.get(i);
-                String colorPrefix = getTierColorCode(match.tier, match.isFade, match.isCustom);
-                String line1 = colorPrefix + (i + 1) + ". §f" + match.name;
-                String line2 = "§7  ΔE: " + colorPrefix + String.format("%.2f", match.deltaE) + " §7#" + match.targetHex;
+                String colorPrefix = getTierColorCode(match.tier(), match.isFade(), match.isCustom());
+                String line1 = colorPrefix + (i + 1) + ". §f" + match.name();
+                String line2 = "§7  ΔE: " + colorPrefix + String.format("%.2f", match.deltaE()) + " §7#" + match.targetHex();
                 maxTextWidth = Math.max(maxTextWidth, textRenderer.getWidth(line1));
                 maxTextWidth = Math.max(maxTextWidth, textRenderer.getWidth(line2));
             }
@@ -556,15 +555,15 @@ public class InfoBoxRenderer {
             context.drawText(client.textRenderer, Text.literal("§7§lTop 3 Matches:"),
                 boxX + 5, boxY + yOffset, 0xFFFFFFFF, true);
 
-            var top3 = hoveredItemData.analysisResult.top3Matches;
+            var top3 = hoveredItemData.analysisResult.top3Matches();
 
             for (int i = 0; i < Math.min(3, top3.size()); i++) {
                 var match = top3.get(i);
                 int matchY = boxY + yOffset + 12 + (i * 25);
 
-                String colorPrefix = getTierColorCode(match.tier, match.isFade, match.isCustom);
-                String line1 = colorPrefix + (i + 1) + ". §f" + match.name;
-                String line2 = "§7  ΔE: " + colorPrefix + String.format("%.2f", match.deltaE) + " §7#" + match.targetHex;
+                String colorPrefix = getTierColorCode(match.tier(), match.isFade(), match.isCustom());
+                String line1 = colorPrefix + (i + 1) + ". §f" + match.name();
+                String line2 = "§7  ΔE: " + colorPrefix + String.format("%.2f", match.deltaE()) + " §7#" + match.targetHex();
 
                 context.drawText(client.textRenderer, Text.literal(line1),
                     boxX + 5, matchY, 0xFFFFFFFF, true);

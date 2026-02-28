@@ -1,18 +1,16 @@
 package schnerry.seymouranalyzer.scanner;
 
+import lombok.Getter;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.gui.screen.ingame.GenericContainerScreen;
-import net.minecraft.component.DataComponentTypes;
-import net.minecraft.component.type.DyedColorComponent;
-import net.minecraft.component.type.NbtComponent;
 import net.minecraft.entity.decoration.ItemFrameEntity;
 import net.minecraft.item.ItemStack;
-import net.minecraft.nbt.NbtCompound;
 import net.minecraft.screen.slot.Slot;
 import net.minecraft.text.Text;
 import net.minecraft.util.hit.BlockHitResult;
 import net.minecraft.util.hit.HitResult;
 import net.minecraft.util.math.BlockPos;
+import net.minecraft.util.math.Box;
 import net.minecraft.world.World;
 import schnerry.seymouranalyzer.Seymouranalyzer;
 import schnerry.seymouranalyzer.analyzer.ColorAnalyzer;
@@ -20,6 +18,8 @@ import schnerry.seymouranalyzer.analyzer.PatternDetector;
 import schnerry.seymouranalyzer.config.ClothConfig;
 import schnerry.seymouranalyzer.data.ArmorPiece;
 import schnerry.seymouranalyzer.data.CollectionManager;
+import schnerry.seymouranalyzer.util.ItemStackUtils;
+import schnerry.seymouranalyzer.util.StringUtility;
 
 import java.util.*;
 
@@ -28,7 +28,9 @@ import java.util.*;
  * Exact port from ChatTriggers index.js scanning logic
  */
 public class ChestScanner {
+    @Getter
     private boolean scanningEnabled = false;
+    @Getter
     private boolean exportingEnabled = false;
     private final Map<String, ArmorPiece> exportCollection = new HashMap<>();
     private long lastChestOpenTime = 0;
@@ -52,10 +54,6 @@ public class ChestScanner {
         Seymouranalyzer.LOGGER.info("Scanning stopped, collection saved");
     }
 
-    public boolean isScanningEnabled() {
-        return scanningEnabled;
-    }
-
     public void startExport() {
         if (scanningEnabled) {
             Seymouranalyzer.LOGGER.warn("Cannot start exporting while scanning");
@@ -67,10 +65,6 @@ public class ChestScanner {
 
     public void stopExport() {
         exportingEnabled = false;
-    }
-
-    public boolean isExportingEnabled() {
-        return exportingEnabled;
     }
 
     public Map<String, ArmorPiece> getExportCollection() {
@@ -118,24 +112,24 @@ public class ChestScanner {
                 if (stack.isEmpty()) continue;
 
                 String itemName = stack.getName().getString();
-                if (!isSeymourArmor(itemName)) continue;
+                if (!StringUtility.isSeymourArmor(itemName)) continue;
 
-                String uuid = extractUuidFromItem(stack);
+                String uuid = ItemStackUtils.getOrCreateItemUUID(stack);
                 if (uuid == null) continue;
 
                 // Check if already in collection/export
                 if (CollectionManager.getInstance().hasPiece(uuid) && !exportingEnabled) continue;
                 if (exportingEnabled && exportCollection.containsKey(uuid)) continue;
 
-                String itemHex = extractHexFromItem(stack);
+                String itemHex = ItemStackUtils.extractHex(stack);
                 if (itemHex == null) continue;
 
                 ColorAnalyzer.AnalysisResult analysis = ColorAnalyzer.getInstance().analyzeArmorColor(itemHex, itemName);
                 if (analysis == null) continue;
 
-                ColorAnalyzer.ColorMatch best = analysis.bestMatch;
+                ColorAnalyzer.ColorMatch best = analysis.bestMatch();
                 int itemRgb = Integer.parseInt(itemHex, 16);
-                int targetRgb = Integer.parseInt(best.targetHex, 16);
+                int targetRgb = Integer.parseInt(best.targetHex(), 16);
                 int absoluteDist = Math.abs(((itemRgb >> 16) & 0xFF) - ((targetRgb >> 16) & 0xFF)) +
                                   Math.abs(((itemRgb >> 8) & 0xFF) - ((targetRgb >> 8) & 0xFF)) +
                                   Math.abs((itemRgb & 0xFF) - (targetRgb & 0xFF));
@@ -145,34 +139,34 @@ public class ChestScanner {
 
                 // Store top 3 matches
                 List<ArmorPiece.ColorMatch> top3Matches = new ArrayList<>();
-                for (int m = 0; m < 3 && m < analysis.top3Matches.size(); m++) {
-                    ColorAnalyzer.ColorMatch match = analysis.top3Matches.get(m);
-                    int matchRgb = Integer.parseInt(match.targetHex, 16);
+                for (int m = 0; m < 3 && m < analysis.top3Matches().size(); m++) {
+                    ColorAnalyzer.ColorMatch match = analysis.top3Matches().get(m);
+                    int matchRgb = Integer.parseInt(match.targetHex(), 16);
                     int matchAbsoluteDist = Math.abs(((itemRgb >> 16) & 0xFF) - ((matchRgb >> 16) & 0xFF)) +
                                            Math.abs(((itemRgb >> 8) & 0xFF) - ((matchRgb >> 8) & 0xFF)) +
                                            Math.abs((itemRgb & 0xFF) - (matchRgb & 0xFF));
 
                     top3Matches.add(new ArmorPiece.ColorMatch(
-                        match.name,
-                        match.targetHex,
-                        match.deltaE,
+                            match.name(),
+                            match.targetHex(),
+                            match.deltaE(),
                         matchAbsoluteDist,
-                        match.tier
+                            match.tier()
                     ));
                 }
 
                 // Create armor piece
                 ArmorPiece piece = new ArmorPiece();
-                piece.setPieceName(removeFormatting(itemName));
+                piece.setPieceName(StringUtility.removeFormatting(itemName));
                 piece.setUuid(uuid);
                 piece.setHexcode(itemHex);
                 piece.setSpecialPattern(specialPattern);
                 piece.setBestMatch(new ArmorPiece.BestMatch(
-                    best.name,
-                    best.targetHex,
-                    best.deltaE,
+                        best.name(),
+                        best.targetHex(),
+                        best.deltaE(),
                     absoluteDist,
-                    analysis.tier
+                        analysis.tier()
                 ));
                 piece.setAllMatches(top3Matches);
                 piece.setWordMatch(wordMatch);
@@ -236,7 +230,7 @@ public class ChestScanner {
                 double z = client.player.getZ();
                 double radius = 64.0;
 
-                net.minecraft.util.math.Box searchBox = new net.minecraft.util.math.Box(
+                Box searchBox = new Box(
                     x - radius, y - radius, z - radius,
                     x + radius, y + radius, z + radius
                 );
@@ -262,25 +256,25 @@ public class ChestScanner {
 
                 String itemName = stack.getName().getString();
 
-                if (!isSeymourArmor(itemName)) continue;
+                if (!StringUtility.isSeymourArmor(itemName)) continue;
 
-                String uuid = extractUuidFromItem(stack);
+                String uuid = ItemStackUtils.getOrCreateItemUUID(stack);
 
                 if (uuid == null) continue;
 
                 if (CollectionManager.getInstance().hasPiece(uuid) && !exportingEnabled) continue;
                 if (exportingEnabled && exportCollection.containsKey(uuid)) continue;
 
-                String itemHex = extractHexFromItem(stack);
+                String itemHex = ItemStackUtils.extractHex(stack);
 
                 if (itemHex == null) continue;
 
                 ColorAnalyzer.AnalysisResult analysis = ColorAnalyzer.getInstance().analyzeArmorColor(itemHex, itemName);
                 if (analysis == null) continue;
 
-                ColorAnalyzer.ColorMatch best = analysis.bestMatch;
+                ColorAnalyzer.ColorMatch best = analysis.bestMatch();
                 int itemRgb = Integer.parseInt(itemHex, 16);
-                int targetRgb = Integer.parseInt(best.targetHex, 16);
+                int targetRgb = Integer.parseInt(best.targetHex(), 16);
                 int absoluteDist = Math.abs(((itemRgb >> 16) & 0xFF) - ((targetRgb >> 16) & 0xFF)) +
                                   Math.abs(((itemRgb >> 8) & 0xFF) - ((targetRgb >> 8) & 0xFF)) +
                                   Math.abs((itemRgb & 0xFF) - (targetRgb & 0xFF));
@@ -290,34 +284,34 @@ public class ChestScanner {
 
                 // Store top 3 matches
                 List<ArmorPiece.ColorMatch> top3Matches = new ArrayList<>();
-                for (int m = 0; m < 3 && m < analysis.top3Matches.size(); m++) {
-                    ColorAnalyzer.ColorMatch match = analysis.top3Matches.get(m);
-                    int matchRgb = Integer.parseInt(match.targetHex, 16);
+                for (int m = 0; m < 3 && m < analysis.top3Matches().size(); m++) {
+                    ColorAnalyzer.ColorMatch match = analysis.top3Matches().get(m);
+                    int matchRgb = Integer.parseInt(match.targetHex(), 16);
                     int matchAbsoluteDist = Math.abs(((itemRgb >> 16) & 0xFF) - ((matchRgb >> 16) & 0xFF)) +
                                            Math.abs(((itemRgb >> 8) & 0xFF) - ((matchRgb >> 8) & 0xFF)) +
                                            Math.abs((itemRgb & 0xFF) - (matchRgb & 0xFF));
 
                     top3Matches.add(new ArmorPiece.ColorMatch(
-                        match.name,
-                        match.targetHex,
-                        match.deltaE,
+                            match.name(),
+                            match.targetHex(),
+                            match.deltaE(),
                         matchAbsoluteDist,
-                        match.tier
+                            match.tier()
                     ));
                 }
 
                 // Create armor piece
                 ArmorPiece piece = new ArmorPiece();
-                piece.setPieceName(removeFormatting(itemName));
+                piece.setPieceName(StringUtility.removeFormatting(itemName));
                 piece.setUuid(uuid);
                 piece.setHexcode(itemHex);
                 piece.setSpecialPattern(specialPattern);
                 piece.setBestMatch(new ArmorPiece.BestMatch(
-                    best.name,
-                    best.targetHex,
-                    best.deltaE,
+                        best.name(),
+                        best.targetHex(),
+                        best.deltaE(),
                     absoluteDist,
-                    analysis.tier
+                        analysis.tier()
                 ));
                 piece.setAllMatches(top3Matches);
                 piece.setWordMatch(wordMatch);
@@ -379,96 +373,6 @@ public class ChestScanner {
             (int) Math.floor(client.player.getY()),
             (int) Math.floor(client.player.getZ())
         );
-    }
-
-    /**
-     * Extract hex from item (matches old module logic)
-     */
-    public String extractHex(ItemStack stack) {
-        return extractHexFromItem(stack);
-    }
-
-    private String extractHexFromItem(ItemStack stack) {
-        // Extract from NBT data (custom_data component)
-        NbtComponent nbtComponent = stack.getOrDefault(DataComponentTypes.CUSTOM_DATA, NbtComponent.DEFAULT);
-        NbtCompound nbt = nbtComponent.copyNbt();
-
-        // Check for color in custom_data (Seymour items store it as "R:G:B")
-        if (nbt.contains("color")) {
-            String colorStr = nbt.getString("color").orElse("");
-            if (colorStr.contains(":")) {
-                return rgbStringToHex(colorStr);
-            }
-        }
-
-        // Fallback: Try DyedColorComponent
-        DyedColorComponent dyedColor = stack.getOrDefault(DataComponentTypes.DYED_COLOR, null);
-        if (dyedColor != null) {
-            int rgb = dyedColor.rgb();
-            return String.format("%02X%02X%02X", (rgb >> 16) & 0xFF, (rgb >> 8) & 0xFF, rgb & 0xFF);
-        }
-
-        return null;
-    }
-
-    /**
-     * Extract UUID from item (matches old module logic)
-     */
-    public String getOrCreateItemUUID(ItemStack stack) {
-        return extractUuidFromItem(stack);
-    }
-
-    private String extractUuidFromItem(ItemStack stack) {
-        NbtComponent nbtComponent = stack.getOrDefault(DataComponentTypes.CUSTOM_DATA, NbtComponent.DEFAULT);
-        NbtCompound nbt = nbtComponent.copyNbt();
-
-        // Check for UUID in custom_data
-        if (nbt.contains("uuid")) {
-            return nbt.getString("uuid").orElse(null);
-        }
-
-        return null;
-    }
-
-    /**
-     * Convert RGB string (R:G:B) to hex
-     */
-    private String rgbStringToHex(String rgbString) {
-        try {
-            String[] parts = rgbString.split(":");
-            if (parts.length == 3) {
-                int r = Integer.parseInt(parts[0]);
-                int g = Integer.parseInt(parts[1]);
-                int b = Integer.parseInt(parts[2]);
-                return String.format("%02X%02X%02X",
-                    Math.max(0, Math.min(255, r)),
-                    Math.max(0, Math.min(255, g)),
-                    Math.max(0, Math.min(255, b))
-                );
-            }
-        } catch (NumberFormatException e) {
-            // Invalid format
-        }
-        return null;
-    }
-
-    /**
-     * Check if item is Seymour armor (matches old module logic)
-     */
-    public static boolean isSeymourArmor(String itemName) {
-        String cleanName = removeFormatting(itemName);
-        // All possible Seymour armor pieces
-        return cleanName.contains("Velvet Top Hat") ||
-               cleanName.contains("Cashmere Jacket") ||
-               cleanName.contains("Satin Trousers") ||
-               cleanName.contains("Oxford Shoes");
-    }
-
-    /**
-     * Remove formatting codes (§)
-     */
-    private static String removeFormatting(String text) {
-        return text.replaceAll("§[0-9a-fk-or]", "");
     }
 }
 

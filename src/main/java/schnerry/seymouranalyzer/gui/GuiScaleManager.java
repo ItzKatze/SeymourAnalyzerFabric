@@ -3,6 +3,7 @@ package schnerry.seymouranalyzer.gui;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.gui.screen.Screen;
+import schnerry.seymouranalyzer.Seymouranalyzer;
 
 /**
  * Manages GUI scale forcing for mod screens
@@ -35,7 +36,7 @@ public class GuiScaleManager {
         // Save original scale if not already saved
         if (originalGuiScale == -1) {
             originalGuiScale = client.options.getGuiScale().getValue();
-            schnerry.seymouranalyzer.Seymouranalyzer.LOGGER.info("[GuiScale] Saved original GUI scale: " + originalGuiScale);
+            Seymouranalyzer.LOGGER.info("[GuiScale] Saved original GUI scale: " + originalGuiScale);
         }
 
         isModGuiOpen = true;
@@ -47,7 +48,7 @@ public class GuiScaleManager {
                 client.getWindow().setScaleFactor(2);
             }
             client.onResolutionChanged();
-            schnerry.seymouranalyzer.Seymouranalyzer.LOGGER.info("[GuiScale] Set GUI scale to 2");
+            Seymouranalyzer.LOGGER.info("[GuiScale] Set GUI scale to 2");
         }
     }
 
@@ -63,7 +64,7 @@ public class GuiScaleManager {
         // Check if we're still in a mod GUI (nested GUIs)
         Screen currentScreen = client.currentScreen;
         if (isModScreen(currentScreen)) {
-            schnerry.seymouranalyzer.Seymouranalyzer.LOGGER.info("[GuiScale] Still in mod GUI, keeping scale at 2");
+            Seymouranalyzer.LOGGER.info("[GuiScale] Still in mod GUI, keeping scale at 2");
             return;
         }
 
@@ -74,7 +75,7 @@ public class GuiScaleManager {
                 client.getWindow().setScaleFactor(originalGuiScale);
             }
             client.onResolutionChanged();
-            schnerry.seymouranalyzer.Seymouranalyzer.LOGGER.info("[GuiScale] Restored GUI scale to " + originalGuiScale);
+            Seymouranalyzer.LOGGER.info("[GuiScale] Restored GUI scale to " + originalGuiScale);
             originalGuiScale = -1; // Reset
         }
     }
@@ -103,17 +104,17 @@ public class GuiScaleManager {
 
         // Debug logging
         if (isModGuiOpen && currentScreen == null) {
-            schnerry.seymouranalyzer.Seymouranalyzer.LOGGER.info("[GuiScale] Detected GUI closed (was mod GUI, now null)");
+            Seymouranalyzer.LOGGER.info("[GuiScale] Detected GUI closed (was mod GUI, now null)");
         }
 
         // If we should be in mod GUI but aren't marked as such
         if (shouldBeModGui && !isModGuiOpen) {
-            schnerry.seymouranalyzer.Seymouranalyzer.LOGGER.info("[GuiScale] Detected mod GUI opened in tick()");
+            Seymouranalyzer.LOGGER.info("[GuiScale] Detected mod GUI opened in tick()");
             onModGuiOpen();
         }
         // If we shouldn't be in mod GUI but are marked as such
         else if (!shouldBeModGui && isModGuiOpen) {
-            schnerry.seymouranalyzer.Seymouranalyzer.LOGGER.info("[GuiScale] Detected mod GUI closed in tick()");
+            Seymouranalyzer.LOGGER.info("[GuiScale] Detected mod GUI closed in tick()");
             onModGuiClose();
         }
     }

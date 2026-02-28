@@ -1,6 +1,7 @@
 package schnerry.seymouranalyzer.config;
 
 import net.minecraft.client.gui.DrawContext;
+import net.minecraft.client.gui.screen.Screen;
 import net.minecraft.client.gui.widget.ButtonWidget;
 import net.minecraft.client.gui.Click;
 import net.minecraft.text.Text;
@@ -25,7 +26,7 @@ public class PriorityEditorScreen extends ModScreen {
     private static final int LIST_WIDTH = 400;
     private static final int LIST_START_Y = 60;
 
-    public PriorityEditorScreen(net.minecraft.client.gui.screen.Screen parent) {
+    public PriorityEditorScreen(Screen parent) {
         super(Text.literal("Match Priority Editor"), parent);
         this.priorities = new ArrayList<>(ClothConfig.getInstance().getMatchPriorities());
     }

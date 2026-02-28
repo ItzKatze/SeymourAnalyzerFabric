@@ -12,6 +12,7 @@ import net.minecraft.item.tooltip.TooltipType;
 import net.minecraft.nbt.NbtCompound;
 import net.minecraft.text.Text;
 import schnerry.seymouranalyzer.Seymouranalyzer;
+import schnerry.seymouranalyzer.render.InfoBoxRenderer;
 
 import java.util.List;
 import java.util.Set;
@@ -72,7 +73,7 @@ public class ItemDebugger {
             if (client.currentScreen instanceof HandledScreen<?>) {
                 // Use the mixin-captured ItemStack from InfoBoxRenderer
                 // This avoids reflection and works reliably even with other mods
-                ItemStack stack = schnerry.seymouranalyzer.render.InfoBoxRenderer.getInstance().getLastHoveredStack();
+                ItemStack stack = InfoBoxRenderer.getInstance().getLastHoveredStack();
 
                 if (stack != null && !stack.isEmpty()) {
                     // Only log if it's a different item than last time

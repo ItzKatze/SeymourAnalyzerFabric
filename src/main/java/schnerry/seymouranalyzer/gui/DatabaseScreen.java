@@ -482,7 +482,7 @@ public class DatabaseScreen extends ModScreen {
 
         // Hex color box
         ColorMath.RGB rgb = ColorMath.hexToRgb(piece.getHexcode());
-        int color = 0xFF000000 | (rgb.r << 16) | (rgb.g << 8) | rgb.b;
+        int color = 0xFF000000 | (rgb.r() << 16) | (rgb.g() << 8) | rgb.b();
         context.fill(200, y, 285, y + 16, color);
 
         // Draw text - using the EXACT same approach as the title/headers that ARE working
@@ -615,7 +615,7 @@ public class DatabaseScreen extends ModScreen {
 
             // Draw match color box
             ColorMath.RGB matchRgb = ColorMath.hexToRgb(match.targetHex);
-            int matchColor = 0xFF000000 | (matchRgb.r << 16) | (matchRgb.g << 8) | matchRgb.b;
+            int matchColor = 0xFF000000 | (matchRgb.r() << 16) | (matchRgb.g() << 8) | matchRgb.b();
             context.fill(30, currentY, 90, currentY + 14, matchColor);
 
             // Draw match name

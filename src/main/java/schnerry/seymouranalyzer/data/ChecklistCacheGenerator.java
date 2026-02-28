@@ -3,6 +3,7 @@ package schnerry.seymouranalyzer.data;
 import com.google.gson.Gson;
 import com.google.gson.JsonObject;
 import schnerry.seymouranalyzer.Seymouranalyzer;
+import schnerry.seymouranalyzer.render.InfoBoxRenderer;
 import schnerry.seymouranalyzer.util.ColorMath;
 
 import java.io.InputStream;
@@ -10,10 +11,6 @@ import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
 import java.util.*;
 
-/**
- * Utility class to generate checklist caches for all categories
- * Called on mod init and after collection changes
- */
 public class ChecklistCacheGenerator {
 
     private static class ChecklistEntry {
@@ -90,7 +87,7 @@ public class ChecklistCacheGenerator {
         cache.save();
 
         // Clear InfoBoxRenderer's cached hover data so it will be regenerated with new cache data
-        schnerry.seymouranalyzer.render.InfoBoxRenderer.forceCloseHoveredDataCache();
+        InfoBoxRenderer.forceCloseHoveredDataCache();
 
         Seymouranalyzer.LOGGER.info("Completed full checklist cache generation for {} normal and {} fade dye categories",
             normalCategories.size(), fadeDyeCategories.size());

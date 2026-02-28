@@ -2,7 +2,6 @@ package schnerry.seymouranalyzer.render;
 
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.render.*;
-import net.minecraft.client.render.debug.DebugRenderer;
 import net.minecraft.client.util.math.MatrixStack;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.math.Vec3d;
@@ -94,7 +93,7 @@ public class BlockHighlighter {
     private void drawBoxOutline(MatrixStack matrices, VertexConsumerProvider vertexConsumers,
                                  float x1, float y1, float z1, float x2, float y2, float z2,
                                  float r, float g, float b, float a) {
-        VertexConsumer lines = vertexConsumers.getBuffer(RenderLayer.getLines());
+        VertexConsumer lines = vertexConsumers.getBuffer(RenderLayers.lines());
         Matrix4f matrix = matrices.peek().getPositionMatrix();
 
         // Bottom face edges

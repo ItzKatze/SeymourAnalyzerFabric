@@ -1,23 +1,31 @@
 package schnerry.seymouranalyzer.command;
 
 import com.mojang.brigadier.CommandDispatcher;
-import com.mojang.brigadier.LiteralMessage;
 import com.mojang.brigadier.arguments.StringArgumentType;
 import com.mojang.brigadier.context.CommandContext;
 import net.fabricmc.fabric.api.client.command.v2.FabricClientCommandSource;
-import net.minecraft.text.ClickEvent;
-import net.minecraft.text.HoverEvent;
-import net.minecraft.text.Style;
-import net.minecraft.text.Text;
+import net.minecraft.client.MinecraftClient;
+import net.minecraft.text.*;
+import net.minecraft.util.math.BlockPos;
+import schnerry.seymouranalyzer.Seymouranalyzer;
+import schnerry.seymouranalyzer.SeymouranalyzerClient;
+import schnerry.seymouranalyzer.analyzer.ColorAnalyzer;
+import schnerry.seymouranalyzer.analyzer.PatternDetector;
 import schnerry.seymouranalyzer.config.ClothConfig;
+import schnerry.seymouranalyzer.config.ConfigScreen;
+import schnerry.seymouranalyzer.config.PriorityEditorScreen;
 import schnerry.seymouranalyzer.data.ArmorPiece;
 import schnerry.seymouranalyzer.data.CollectionManager;
 import schnerry.seymouranalyzer.data.ColorDatabase;
+import schnerry.seymouranalyzer.debug.ItemDebugger;
 import schnerry.seymouranalyzer.gui.*;
+import schnerry.seymouranalyzer.render.BlockHighlighter;
+import schnerry.seymouranalyzer.render.HexTooltipRenderer;
+import schnerry.seymouranalyzer.render.InfoBoxRenderer;
+import schnerry.seymouranalyzer.render.ItemSlotHighlighter;
 import schnerry.seymouranalyzer.util.ColorMath;
 
-import java.util.ArrayList;
-import java.util.List;
+import java.util.*;
 
 import static net.fabricmc.fabric.api.client.command.v2.ClientCommandManager.*;
 
@@ -186,7 +194,7 @@ public class SeymourCommand {
 
     private static int toggleOption(CommandContext<FabricClientCommandSource> ctx) {
         String option = StringArgumentType.getString(ctx, "option").toLowerCase();
-        schnerry.seymouranalyzer.config.ClothConfig config = schnerry.seymouranalyzer.config.ClothConfig.getInstance();
+        ClothConfig config = ClothConfig.getInstance();
 
         switch (option) {
             case "infobox":
@@ -246,8 +254,8 @@ public class SeymourCommand {
                     (config.isItemFramesEnabled() ? "§aenabled" : "§cdisabled") + "§7!"));
                 break;
             case "hextooltip":
-                boolean newState = !schnerry.seymouranalyzer.render.HexTooltipRenderer.getInstance().isEnabled();
-                schnerry.seymouranalyzer.render.HexTooltipRenderer.getInstance().setEnabled(newState);
+                boolean newState = !HexTooltipRenderer.getInstance().isEnabled();
+                HexTooltipRenderer.getInstance().setEnabled(newState);
                 ctx.getSource().sendFeedback(Text.literal("§a[Seymour Analyzer] §7Hex tooltip display " +
                     (newState ? "§aenabled" : "§cdisabled") + "§7!"));
                 break;
@@ -261,7 +269,7 @@ public class SeymourCommand {
     }
 
     private static int showToggleHelp(CommandContext<FabricClientCommandSource> ctx) {
-        schnerry.seymouranalyzer.config.ClothConfig config = schnerry.seymouranalyzer.config.ClothConfig.getInstance();
+        ClothConfig config = ClothConfig.getInstance();
 
         ctx.getSource().sendFeedback(Text.literal("§c[Seymour] §7Usage: §f/seymour toggle <option>"));
         ctx.getSource().sendFeedback(Text.literal("§7Available options (§a✓§7 = enabled, §c✗§7 = disabled):"));
@@ -277,7 +285,7 @@ public class SeymourCommand {
         ctx.getSource().sendFeedback(Text.literal("  §edupes §8- " + getToggleIndicator(config.isDupesEnabled()) + " §7Toggle dupe highlights"));
         ctx.getSource().sendFeedback(Text.literal("  §ehighfades §8- " + getToggleIndicator(config.isShowHighFades()) + " §7Toggle high fade matches (T2+)"));
         ctx.getSource().sendFeedback(Text.literal("  §eitemframes §8- " + getToggleIndicator(config.isItemFramesEnabled()) + " §7Toggle item frame scanning"));
-        ctx.getSource().sendFeedback(Text.literal("  §ehextooltip §8- " + getToggleIndicator(schnerry.seymouranalyzer.render.HexTooltipRenderer.getInstance().isEnabled()) + " §7Toggle hex tooltip display"));
+        ctx.getSource().sendFeedback(Text.literal("  §ehextooltip §8- " + getToggleIndicator(HexTooltipRenderer.getInstance().isEnabled()) + " §7Toggle hex tooltip display"));
         return 0;
     }
 
@@ -365,7 +373,7 @@ public class SeymourCommand {
         ColorDatabase.getInstance().rebuildLabCache();
 
         // Mark custom colors for reload in checklist GUI
-        schnerry.seymouranalyzer.gui.ArmorChecklistScreen.markCustomColorsForReload();
+        ArmorChecklistScreen.markCustomColorsForReload();
 
         ctx.getSource().sendFeedback(Text.literal("§a[Seymour Analyzer] §7Added custom color: §f" +
             colorName + " §7(#" + hex + ")"));
@@ -387,7 +395,7 @@ public class SeymourCommand {
         ColorDatabase.getInstance().rebuildLabCache();
 
         // Mark custom colors for reload in checklist GUI
-        schnerry.seymouranalyzer.gui.ArmorChecklistScreen.markCustomColorsForReload();
+        ArmorChecklistScreen.markCustomColorsForReload();
 
         ctx.getSource().sendFeedback(Text.literal("§a[Seymour Analyzer] §7Removed custom color: §f" +
             colorName + " §7(#" + hex + ")"));
@@ -396,7 +404,7 @@ public class SeymourCommand {
 
     private static int listCustomColors(CommandContext<FabricClientCommandSource> ctx) {
         ClothConfig config = ClothConfig.getInstance();
-        var colors = config.getCustomColors();
+        Map<String, String> colors = config.getCustomColors();
 
         if (colors.isEmpty()) {
             ctx.getSource().sendFeedback(Text.literal("§a[Seymour Analyzer] §7No custom colors added yet!"));
@@ -421,7 +429,7 @@ public class SeymourCommand {
             return 0;
         }
 
-        if (pattern.length() < 1 || pattern.length() > 6) {
+        if (pattern.isEmpty() || pattern.length() > 6) {
             ctx.getSource().sendError(Text.literal("§cPattern must be 1-6 characters long!"));
             return 0;
         }
@@ -521,7 +529,7 @@ public class SeymourCommand {
         int withWord = 0;
 
         // Track duplicates (same hex, different UUID)
-        java.util.Map<String, Integer> hexCounts = new java.util.HashMap<>();
+        Map<String, Integer> hexCounts = new HashMap<>();
 
         for (var piece : collection.values()) {
             // Count by tier
@@ -614,25 +622,25 @@ public class SeymourCommand {
 
     private static int resetPosition(CommandContext<FabricClientCommandSource> ctx) {
         // Info box position is now managed by InfoBoxRenderer directly (draggable)
-        schnerry.seymouranalyzer.render.InfoBoxRenderer.resetPosition();
+        InfoBoxRenderer.resetPosition();
         ctx.getSource().sendFeedback(Text.literal("§a[Seymour Analyzer] §7Info box position reset!"));
         return 1;
     }
 
     private static int startScan(CommandContext<FabricClientCommandSource> ctx) {
-        schnerry.seymouranalyzer.SeymouranalyzerClient.getScanner().startScan();
+        SeymouranalyzerClient.getScanner().startScan();
         ctx.getSource().sendFeedback(Text.literal("§a[Seymour Analyzer] §7Chest scanning §astarted§7! Open chests to scan armor pieces."));
         return 1;
     }
 
     private static int stopScan(CommandContext<FabricClientCommandSource> ctx) {
-        schnerry.seymouranalyzer.SeymouranalyzerClient.getScanner().stopScan();
+        SeymouranalyzerClient.getScanner().stopScan();
         ctx.getSource().sendFeedback(Text.literal("§a[Seymour Analyzer] §7Chest scanning §cstopped§7!"));
         return 1;
     }
 
     private static int startExport(CommandContext<FabricClientCommandSource> ctx) {
-        var scanner = schnerry.seymouranalyzer.SeymouranalyzerClient.getScanner();
+        var scanner = SeymouranalyzerClient.getScanner();
         if (scanner.isScanningEnabled()) {
             ctx.getSource().sendError(Text.literal("§c[Seymour Analyzer] Please stop scanning before starting export!"));
             return 0;
@@ -643,7 +651,7 @@ public class SeymourCommand {
     }
 
     private static int stopExport(CommandContext<FabricClientCommandSource> ctx) {
-        var scanner = schnerry.seymouranalyzer.SeymouranalyzerClient.getScanner();
+        var scanner = SeymouranalyzerClient.getScanner();
         scanner.stopExport();
 
         ctx.getSource().sendFeedback(Text.literal("§a[Seymour Analyzer] §7Exporting §astopped§7! Copying data to clipboard..."));
@@ -677,7 +685,7 @@ public class SeymourCommand {
             }
 
             // Copy to clipboard using GLFW (Minecraft's clipboard system)
-            net.minecraft.client.MinecraftClient mc = net.minecraft.client.MinecraftClient.getInstance();
+            MinecraftClient mc = MinecraftClient.getInstance();
             mc.keyboard.setClipboard(pretty.toString());
 
             ctx.getSource().sendFeedback(Text.literal("§a[Seymour Analyzer] §7Exported §e" +
@@ -689,7 +697,7 @@ public class SeymourCommand {
                 errorMsg = e.getClass().getSimpleName() + " - check console for details";
             }
             ctx.getSource().sendError(Text.literal("§c[Seymour] Failed to copy export to clipboard: " + errorMsg));
-            schnerry.seymouranalyzer.Seymouranalyzer.LOGGER.error("Clipboard export failed", e);
+            Seymouranalyzer.LOGGER.error("Clipboard export failed", e);
         }
 
         return 1;
@@ -697,7 +705,7 @@ public class SeymourCommand {
 
     private static int openDatabaseGUI(CommandContext<FabricClientCommandSource> ctx) {
         try {
-            net.minecraft.client.MinecraftClient mc = net.minecraft.client.MinecraftClient.getInstance();
+            MinecraftClient mc = MinecraftClient.getInstance();
             mc.send(() -> mc.setScreen(new DatabaseScreen(null)));
         } catch (Exception e) {
             ctx.getSource().sendError(Text.literal("§c[Seymour] §7Error: " + e.getMessage()));
@@ -711,7 +719,7 @@ public class SeymourCommand {
 
 
         try {
-            net.minecraft.client.MinecraftClient mc = net.minecraft.client.MinecraftClient.getInstance();
+            MinecraftClient mc = MinecraftClient.getInstance();
             mc.send(() -> {
                 DatabaseScreen screen = new DatabaseScreen(null);
                 screen.setInitialSearch(searchText);
@@ -727,7 +735,7 @@ public class SeymourCommand {
 
     private static int openChecklistGUI(CommandContext<FabricClientCommandSource> ctx) {
         try {
-            net.minecraft.client.MinecraftClient mc = net.minecraft.client.MinecraftClient.getInstance();
+            MinecraftClient mc = MinecraftClient.getInstance();
             mc.send(() -> mc.setScreen(new ArmorChecklistScreen(null)));
             ctx.getSource().sendFeedback(Text.literal("§a[Seymour] §7Checklist GUI opened!"));
         } catch (Exception e) {
@@ -739,7 +747,7 @@ public class SeymourCommand {
 
     private static int openBestSetsGUI(CommandContext<FabricClientCommandSource> ctx) {
         try {
-            net.minecraft.client.MinecraftClient mc = net.minecraft.client.MinecraftClient.getInstance();
+            MinecraftClient mc = MinecraftClient.getInstance();
             mc.send(() -> mc.setScreen(new BestSetsScreen(null)));
             ctx.getSource().sendFeedback(Text.literal("§a[Seymour] §7Best Sets GUI opened!"));
         } catch (Exception e) {
@@ -751,7 +759,7 @@ public class SeymourCommand {
 
     private static int openWordMatchesGUI(CommandContext<FabricClientCommandSource> ctx) {
         try {
-            net.minecraft.client.MinecraftClient mc = net.minecraft.client.MinecraftClient.getInstance();
+            MinecraftClient mc = MinecraftClient.getInstance();
             mc.send(() -> mc.setScreen(new WordMatchesScreen(null)));
             ctx.getSource().sendFeedback(Text.literal("§a[Seymour] §7Word Matches GUI opened!"));
         } catch (Exception e) {
@@ -763,7 +771,7 @@ public class SeymourCommand {
 
     private static int openPatternMatchesGUI(CommandContext<FabricClientCommandSource> ctx) {
         try {
-            net.minecraft.client.MinecraftClient mc = net.minecraft.client.MinecraftClient.getInstance();
+            MinecraftClient mc = MinecraftClient.getInstance();
             mc.send(() -> mc.setScreen(new PatternMatchesScreen(null)));
             ctx.getSource().sendFeedback(Text.literal("§a[Seymour] §7Pattern Matches GUI opened!"));
         } catch (Exception e) {
@@ -775,8 +783,8 @@ public class SeymourCommand {
 
     private static int openConfigGUI(CommandContext<FabricClientCommandSource> ctx) {
         try {
-            net.minecraft.client.MinecraftClient mc = net.minecraft.client.MinecraftClient.getInstance();
-            mc.send(() -> mc.setScreen(schnerry.seymouranalyzer.config.ConfigScreen.createConfigScreen(null)));
+            MinecraftClient mc = MinecraftClient.getInstance();
+            mc.send(() -> mc.setScreen(ConfigScreen.createConfigScreen(null)));
             ctx.getSource().sendFeedback(Text.literal("§a[Seymour] §7Config GUI opened!"));
         } catch (Exception e) {
             ctx.getSource().sendError(Text.literal("§c[Seymour] §7Error: " + e.getMessage()));
@@ -787,8 +795,8 @@ public class SeymourCommand {
 
     private static int openPriorityEditorGUI(CommandContext<FabricClientCommandSource> ctx) {
         try {
-            net.minecraft.client.MinecraftClient mc = net.minecraft.client.MinecraftClient.getInstance();
-            mc.send(() -> mc.setScreen(new schnerry.seymouranalyzer.config.PriorityEditorScreen(null)));
+            MinecraftClient mc = MinecraftClient.getInstance();
+            mc.send(() -> mc.setScreen(new PriorityEditorScreen(null)));
             ctx.getSource().sendFeedback(Text.literal("§a[Seymour] §7Priority Editor opened!"));
         } catch (Exception e) {
             ctx.getSource().sendError(Text.literal("§c[Seymour] §7Error: " + e.getMessage()));
@@ -803,8 +811,8 @@ public class SeymourCommand {
 
             // Parse hex codes from input (can be space-separated)
             String[] hexCodes = hexInput.toUpperCase().split("\\s+");
-            java.util.List<String> validHexes = new java.util.ArrayList<>();
-            java.util.List<String> invalidHexes = new java.util.ArrayList<>();
+            List<String> validHexes = new ArrayList<>();
+            List<String> invalidHexes = new ArrayList<>();
 
             for (String hex : hexCodes) {
                 String cleanHex = hex.replace("#", "").trim();
@@ -826,9 +834,9 @@ public class SeymourCommand {
 
             // Search for pieces with these hex codes
             var collection = CollectionManager.getInstance().getCollection();
-            java.util.List<schnerry.seymouranalyzer.data.ArmorPiece> foundPieces = new java.util.ArrayList<>();
-            java.util.Set<String> foundChestLocations = new java.util.HashSet<>();
-            java.util.List<net.minecraft.util.math.BlockPos> blocksToHighlight = new java.util.ArrayList<>();
+            List<ArmorPiece> foundPieces = new ArrayList<>();
+            Set<String> foundChestLocations = new HashSet<>();
+            List<BlockPos> blocksToHighlight = new ArrayList<>();
 
             for (var piece : collection.values()) {
                 String pieceHex = piece.getHexcode().toUpperCase();
@@ -840,7 +848,7 @@ public class SeymourCommand {
                     if (chestLoc != null) {
                         foundChestLocations.add(chestLoc.toString());
                         // Add block position to highlight
-                        net.minecraft.util.math.BlockPos blockPos = new net.minecraft.util.math.BlockPos(chestLoc.x, chestLoc.y, chestLoc.z);
+                        BlockPos blockPos = new BlockPos(chestLoc.x, chestLoc.y, chestLoc.z);
                         if (!blocksToHighlight.contains(blockPos)) {
                             blocksToHighlight.add(blockPos);
                         }
@@ -850,12 +858,12 @@ public class SeymourCommand {
 
             // Add all found blocks to the highlighter
             if (!blocksToHighlight.isEmpty()) {
-                schnerry.seymouranalyzer.render.BlockHighlighter.getInstance().addBlocks(blocksToHighlight);
+                BlockHighlighter.getInstance().addBlocks(blocksToHighlight);
             }
 
             // Add search hex codes to item highlighter for slot highlighting
             for (String validHex : validHexes) {
-                schnerry.seymouranalyzer.render.ItemSlotHighlighter.getInstance().addSearchHex(validHex);
+                ItemSlotHighlighter.getInstance().addSearchHex(validHex);
             }
 
             // Display results
@@ -888,18 +896,18 @@ public class SeymourCommand {
                     ctx.getSource().sendFeedback(Text.literal("§a§lFound in " + foundChestLocations.size() + " container(s)!"));
 
                     // Build clickable message using ClickEvent.RunCommand record
-                    var style = net.minecraft.text.Style.EMPTY
-                        .withColor(net.minecraft.text.TextColor.fromRgb(0xFFFF55))
+                    var style = Style.EMPTY
+                        .withColor(TextColor.fromRgb(0xFFFF55))
                         .withUnderline(true);
 
                     try {
                         // ClickEvent is an interface with nested record implementations
                         // Use ClickEvent.RunCommand which is a record
-                        var clickEvent = new net.minecraft.text.ClickEvent.RunCommand("/seymour search clear");
+                        var clickEvent = new ClickEvent.RunCommand("/seymour search clear");
                         style = style.withClickEvent(clickEvent);
 
                         // HoverEvent.ShowText is also a record
-                        var hoverEvent = new net.minecraft.text.HoverEvent.ShowText(Text.literal("Clear search now"));
+                        var hoverEvent = new HoverEvent.ShowText(Text.literal("Clear search now"));
                         style = style.withHoverEvent(hoverEvent);
                     } catch (Exception e) {
                         ctx.getSource().sendError(Text.literal("§c[Seymour] Failed to create clickable text: " + e.getMessage()));
@@ -925,8 +933,8 @@ public class SeymourCommand {
 
     private static int clearSearch(CommandContext<FabricClientCommandSource> ctx) {
         try {
-            schnerry.seymouranalyzer.render.BlockHighlighter.getInstance().clearAll();
-            schnerry.seymouranalyzer.render.ItemSlotHighlighter.getInstance().clearSearchHexes();
+            BlockHighlighter.getInstance().clearAll();
+            ItemSlotHighlighter.getInstance().clearSearchHexes();
             ctx.getSource().sendFeedback(Text.literal("§a[Seymour] §7Search cleared!"));
         } catch (Exception e) {
             ctx.getSource().sendError(Text.literal("§c[Seymour] §7Error: " + e.getMessage()));
@@ -935,7 +943,7 @@ public class SeymourCommand {
     }
 
     private static int enableDebugMode(CommandContext<FabricClientCommandSource> ctx) {
-        schnerry.seymouranalyzer.debug.ItemDebugger.getInstance().enable();
+        ItemDebugger.getInstance().enable();
         ctx.getSource().sendFeedback(Text.literal("§a[Seymour Debug] §eEnabled! §7Hover over any item to log ALL data to console."));
         ctx.getSource().sendFeedback(Text.literal("§7Check your console/logs for detailed output."));
         return 1;
@@ -960,13 +968,13 @@ public class SeymourCommand {
                 Thread.sleep(50); // Small delay like the old module
 
                 var collection = CollectionManager.getInstance().getCollection();
-                var keys = new java.util.ArrayList<>(collection.keySet());
+                var keys = new ArrayList<>(collection.keySet());
                 int total = keys.size();
                 int updated = 0;
 
                 ctx.getSource().sendFeedback(Text.literal("§a[Seymour Analyzer] §7Starting word rebuild for §e" + total + " §7pieces..."));
 
-                schnerry.seymouranalyzer.analyzer.PatternDetector detector = schnerry.seymouranalyzer.analyzer.PatternDetector.getInstance();
+                PatternDetector detector = PatternDetector.getInstance();
 
                 for (int i = 0; i < total; i++) {
                     String uuid = keys.get(i);
@@ -1007,13 +1015,13 @@ public class SeymourCommand {
                 Thread.sleep(50);
 
                 var collection = CollectionManager.getInstance().getCollection();
-                var keys = new java.util.ArrayList<>(collection.keySet());
+                var keys = new ArrayList<>(collection.keySet());
                 int total = keys.size();
                 int updated = 0;
 
                 ctx.getSource().sendFeedback(Text.literal("§a[Seymour Analyzer] §7Starting analysis rebuild for §e" + total + " §7pieces..."));
 
-                schnerry.seymouranalyzer.analyzer.ColorAnalyzer analyzer = schnerry.seymouranalyzer.analyzer.ColorAnalyzer.getInstance();
+                ColorAnalyzer analyzer = ColorAnalyzer.getInstance();
 
                 for (int i = 0; i < total; i++) {
                     String uuid = keys.get(i);
@@ -1022,18 +1030,18 @@ public class SeymourCommand {
                     if (piece != null && piece.getHexcode() != null && piece.getPieceName() != null) {
                         var analysis = analyzer.analyzeArmorColor(piece.getHexcode(), piece.getPieceName());
 
-                        if (analysis != null && analysis.bestMatch != null) {
-                            var best = analysis.bestMatch;
+                        if (analysis != null && analysis.bestMatch() != null) {
+                            var best = analysis.bestMatch();
 
                             // Calculate absolute distance
                             int itemRgb = Integer.parseInt(piece.getHexcode(), 16);
-                            int targetRgb = Integer.parseInt(best.targetHex, 16);
+                            int targetRgb = Integer.parseInt(best.targetHex(), 16);
                             int absoluteDist = Math.abs(((itemRgb >> 16) & 0xFF) - ((targetRgb >> 16) & 0xFF)) +
                                               Math.abs(((itemRgb >> 8) & 0xFF) - ((targetRgb >> 8) & 0xFF)) +
                                               Math.abs((itemRgb & 0xFF) - (targetRgb & 0xFF));
 
                             // Update piece with best match data
-                            piece.setBestMatch(best.name, best.targetHex, best.deltaE, absoluteDist, analysis.tier);
+                            piece.setBestMatch(best.name(), best.targetHex(), best.deltaE(), absoluteDist, analysis.tier());
                             updated++;
                         }
                     }
@@ -1067,13 +1075,13 @@ public class SeymourCommand {
                 Thread.sleep(50);
 
                 var collection = CollectionManager.getInstance().getCollection();
-                var keys = new java.util.ArrayList<>(collection.keySet());
+                var keys = new ArrayList<>(collection.keySet());
                 int total = keys.size();
                 int updated = 0;
 
                 ctx.getSource().sendFeedback(Text.literal("§a[Seymour Analyzer] §7Starting matches rebuild for §e" + total + " §7pieces..."));
 
-                schnerry.seymouranalyzer.analyzer.ColorAnalyzer analyzer = schnerry.seymouranalyzer.analyzer.ColorAnalyzer.getInstance();
+                ColorAnalyzer analyzer = ColorAnalyzer.getInstance();
 
                 for (int i = 0; i < total; i++) {
                     String uuid = keys.get(i);
@@ -1082,21 +1090,21 @@ public class SeymourCommand {
                     if (piece != null && piece.getHexcode() != null && piece.getPieceName() != null) {
                         var analysis = analyzer.analyzeArmorColor(piece.getHexcode(), piece.getPieceName());
 
-                        if (analysis != null && analysis.top3Matches != null && !analysis.top3Matches.isEmpty()) {
+                        if (analysis != null && analysis.top3Matches() != null && !analysis.top3Matches().isEmpty()) {
                             int itemRgb = Integer.parseInt(piece.getHexcode(), 16);
 
                             // Build top 3 matches array
-                            java.util.List<schnerry.seymouranalyzer.data.ArmorPiece.ColorMatch> top3 = new java.util.ArrayList<>();
+                            List<ArmorPiece.ColorMatch> top3 = new ArrayList<>();
 
-                            for (int m = 0; m < Math.min(3, analysis.top3Matches.size()); m++) {
-                                var match = analysis.top3Matches.get(m);
-                                int matchRgb = Integer.parseInt(match.targetHex, 16);
+                            for (int m = 0; m < Math.min(3, analysis.top3Matches().size()); m++) {
+                                var match = analysis.top3Matches().get(m);
+                                int matchRgb = Integer.parseInt(match.targetHex(), 16);
                                 int matchAbsoluteDist = Math.abs(((itemRgb >> 16) & 0xFF) - ((matchRgb >> 16) & 0xFF)) +
                                                        Math.abs(((itemRgb >> 8) & 0xFF) - ((matchRgb >> 8) & 0xFF)) +
                                                        Math.abs((itemRgb & 0xFF) - (matchRgb & 0xFF));
 
-                                top3.add(new schnerry.seymouranalyzer.data.ArmorPiece.ColorMatch(
-                                    match.name, match.targetHex, match.deltaE, matchAbsoluteDist, match.tier
+                                top3.add(new ArmorPiece.ColorMatch(
+                                        match.name(), match.targetHex(), match.deltaE(), matchAbsoluteDist, match.tier()
                                 ));
                             }
 
@@ -1132,14 +1140,14 @@ public class SeymourCommand {
             try {
                 Thread.sleep(50);
 
-                var collection = CollectionManager.getInstance().getCollection();
-                var keys = new java.util.ArrayList<>(collection.keySet());
+                Map<String, ArmorPiece> collection = CollectionManager.getInstance().getCollection();
+                ArrayList<String> keys = new ArrayList<>(collection.keySet());
                 int total = keys.size();
                 int updated = 0;
 
                 ctx.getSource().sendFeedback(Text.literal("§a[Seymour Analyzer] §7Starting pattern rebuild for §e" + total + " §7pieces..."));
 
-                schnerry.seymouranalyzer.analyzer.PatternDetector detector = schnerry.seymouranalyzer.analyzer.PatternDetector.getInstance();
+                PatternDetector detector = PatternDetector.getInstance();
 
                 for (int i = 0; i < total; i++) {
                     String uuid = keys.get(i);

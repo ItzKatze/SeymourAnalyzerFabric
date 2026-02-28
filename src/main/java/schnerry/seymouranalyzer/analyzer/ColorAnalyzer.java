@@ -1,5 +1,6 @@
 package schnerry.seymouranalyzer.analyzer;
 
+import schnerry.seymouranalyzer.Seymouranalyzer;
 import schnerry.seymouranalyzer.data.ColorDatabase;
 import schnerry.seymouranalyzer.config.ClothConfig;
 import schnerry.seymouranalyzer.config.MatchPriority;
@@ -8,9 +9,6 @@ import schnerry.seymouranalyzer.util.ColorMath;
 import java.util.*;
 import java.util.stream.Collectors;
 
-/**
- * Analyzes armor colors and finds best matches from the database
- */
 public class ColorAnalyzer {
     private static ColorAnalyzer INSTANCE;
     private final ColorDatabase colorDatabase;
@@ -37,7 +35,7 @@ public class ColorAnalyzer {
      * 5. Separate exact matches (always prioritized)
      * 6. Apply user-defined priority order to non-exact matches
      * 7. Return top 3 matches after prioritization
-     *
+     * <p>
      * This ensures that custom colors and normal colors aren't excluded when there are
      * many fade dye matches, which was causing issues when showHighFades was enabled.
      */
@@ -77,9 +75,9 @@ public class ColorAnalyzer {
         // Take top 5 from each category to prevent any single category from dominating
         // This ensures customs and normals aren't crowded out by fades
         List<ColorMatch> allMatches = new ArrayList<>();
-        allMatches.addAll(customMatches.stream().limit(5).collect(Collectors.toList()));
-        allMatches.addAll(normalMatches.stream().limit(5).collect(Collectors.toList()));
-        allMatches.addAll(fadeMatches.stream().limit(5).collect(Collectors.toList()));
+        allMatches.addAll(customMatches.stream().limit(5).toList());
+        allMatches.addAll(normalMatches.stream().limit(5).toList());
+        allMatches.addAll(fadeMatches.stream().limit(5).toList());
 
         // Step 1: Sort all selected matches by deltaE
         allMatches.sort(Comparator.comparingDouble(m -> m.deltaE));
@@ -87,7 +85,7 @@ public class ColorAnalyzer {
         // Step 2: Take top 10 closest matches by deltaE
         List<ColorMatch> top10ByDeltaE = allMatches.stream()
             .limit(10)
-            .collect(Collectors.toList());
+            .toList();
 
         // Step 3: Separate exact matches (deltaE ~= 0) from regular matches
         // Exact matches should ALWAYS be prioritized above everything else
@@ -145,11 +143,11 @@ public class ColorAnalyzer {
             .collect(Collectors.toList());
 
         if (top3.isEmpty()) {
-            schnerry.seymouranalyzer.Seymouranalyzer.LOGGER.warn("[ColorAnalyzer] No matches found for hex: " + hexcode);
+            Seymouranalyzer.LOGGER.warn("[ColorAnalyzer] No matches found for hex: {}", hexcode);
             return null;
         }
 
-        ColorMatch best = top3.get(0);
+        ColorMatch best = top3.getFirst();
         int tier = calculateTier(best.deltaE, best.isCustom, best.isFade);
 
         return new AnalysisResult(best, top3, tier);
@@ -300,37 +298,11 @@ public class ColorAnalyzer {
         return MatchPriority.NORMAL_T2;
     }
 
-    public static class AnalysisResult {
-        public final ColorMatch bestMatch;
-        public final List<ColorMatch> top3Matches;
-        public final int tier;
-
-        public AnalysisResult(ColorMatch bestMatch, List<ColorMatch> top3Matches, int tier) {
-            this.bestMatch = bestMatch;
-            this.top3Matches = top3Matches;
-            this.tier = tier;
-        }
+    public record AnalysisResult(ColorMatch bestMatch, List<ColorMatch> top3Matches, int tier) {
     }
 
-    public static class ColorMatch {
-        public final String name;
-        public final String targetHex;
-        public final double deltaE;
-        public final int absoluteDistance;
-        public final int tier;
-        public final boolean isCustom;
-        public final boolean isFade;
-
-        public ColorMatch(String name, String targetHex, double deltaE, int absoluteDistance,
-                         int tier, boolean isCustom, boolean isFade) {
-            this.name = name;
-            this.targetHex = targetHex;
-            this.deltaE = deltaE;
-            this.absoluteDistance = absoluteDistance;
-            this.tier = tier;
-            this.isCustom = isCustom;
-            this.isFade = isFade;
-        }
+    public record ColorMatch(String name, String targetHex, double deltaE, int absoluteDistance, int tier,
+                             boolean isCustom, boolean isFade) {
     }
 }
 

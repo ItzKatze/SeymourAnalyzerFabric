@@ -42,7 +42,7 @@ public abstract class HandledScreenMixin {
         method = "drawSlot",
         at = @At("HEAD")
     )
-    private void onDrawSlot(DrawContext context, Slot slot, CallbackInfo ci) {
+    private void onDrawSlot(DrawContext context, Slot slot, int x, int y, CallbackInfo ci) {
         ItemStack stack = slot.getStack();
         if (stack.isEmpty()) return;
 

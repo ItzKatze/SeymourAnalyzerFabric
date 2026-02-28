@@ -193,7 +193,7 @@ public class WordMatchesScreen extends ModScreen {
 
         // Hex box
         ColorMath.RGB rgb = ColorMath.hexToRgb(row.piece.getHexcode());
-        int color = 0xFF000000 | (rgb.r << 16) | (rgb.g << 8) | rgb.b;
+        int color = 0xFF000000 | (rgb.r() << 16) | (rgb.g() << 8) | rgb.b();
         context.fill(400, y - 2, 485, y + 12, color);
 
         // Hex text - with alpha channel

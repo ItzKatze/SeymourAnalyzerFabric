@@ -1,6 +1,9 @@
 package schnerry.seymouranalyzer.mixin;
 
-import net.minecraft.client.render.*;
+import net.minecraft.client.render.Frustum;
+import net.minecraft.client.render.VertexConsumerProvider;
+import net.minecraft.client.render.debug.DebugRenderer;
+import net.minecraft.client.util.BufferAllocator;
 import net.minecraft.client.util.math.MatrixStack;
 import net.minecraft.util.math.Vec3d;
 import org.spongepowered.asm.mixin.Mixin;
@@ -9,41 +12,27 @@ import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 import schnerry.seymouranalyzer.render.BlockHighlighter;
 
-/**
- * DebugRendererMixin for 1.21.10
- *
- * WorldRenderEvents was removed in 1.21.9, so we use a direct mixin.
- * Injects into DebugRenderer.render to draw block highlights alongside debug rendering.
- */
-@Mixin(net.minecraft.client.render.debug.DebugRenderer.class)
+@Mixin(DebugRenderer.class)
 public class DebugRendererMixin {
-
-    /**
-     * Inject at the TAIL of DebugRenderer.render to draw our highlights
-     * after vanilla debug rendering but in the same render pass.
-     */
-    @Inject(
-        method = "render",
-        at = @At("TAIL")
-    )
+    @Inject(method = "render", at = @At("TAIL"))
     private void onDebugRender(
-            MatrixStack matrices,
             Frustum frustum,
-            VertexConsumerProvider.Immediate vertexConsumers,
             double cameraX,
             double cameraY,
             double cameraZ,
-            boolean lateRender,
+            float tickProgress,
             CallbackInfo ci
     ) {
-        // Only render during the late render pass (after translucent blocks)
-        if (!lateRender) return;
-
         BlockHighlighter highlighter = BlockHighlighter.getInstance();
         if (!highlighter.hasHighlights()) return;
 
+        MatrixStack matrices = new MatrixStack();
         Vec3d cameraPos = new Vec3d(cameraX, cameraY, cameraZ);
-        highlighter.renderHighlights(matrices, vertexConsumers, cameraPos);
+        try (BufferAllocator allocator = new BufferAllocator(262_144)) {
+            VertexConsumerProvider.Immediate vertexConsumers = VertexConsumerProvider.immediate(allocator);
+            highlighter.renderHighlights(matrices, vertexConsumers, cameraPos);
+            vertexConsumers.draw();
+        }
     }
 }
 
