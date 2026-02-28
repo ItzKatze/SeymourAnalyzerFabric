@@ -76,7 +76,7 @@ public class SeymouranalyzerClient implements ClientModInitializer {
 
         // Register client tick for scanner
         ClientTickEvents.END_CLIENT_TICK.register(client -> {
-            if (client.player != null && client.world != null) {
+            if (client.player != null && client.level != null) {
                 chestScanner.tick(client);
                 // Tick collection manager for auto-save
                 CollectionManager.getInstance().tick();

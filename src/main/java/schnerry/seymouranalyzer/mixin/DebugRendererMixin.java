@@ -1,11 +1,11 @@
 package schnerry.seymouranalyzer.mixin;
 
-import net.minecraft.client.render.Frustum;
-import net.minecraft.client.render.VertexConsumerProvider;
-import net.minecraft.client.render.debug.DebugRenderer;
-import net.minecraft.client.util.BufferAllocator;
-import net.minecraft.client.util.math.MatrixStack;
-import net.minecraft.util.math.Vec3d;
+import com.mojang.blaze3d.vertex.ByteBufferBuilder;
+import com.mojang.blaze3d.vertex.PoseStack;
+import net.minecraft.client.renderer.MultiBufferSource;
+import net.minecraft.client.renderer.culling.Frustum;
+import net.minecraft.client.renderer.debug.DebugRenderer;
+import net.minecraft.world.phys.Vec3;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
@@ -14,7 +14,7 @@ import schnerry.seymouranalyzer.render.BlockHighlighter;
 
 @Mixin(DebugRenderer.class)
 public class DebugRendererMixin {
-    @Inject(method = "render", at = @At("TAIL"))
+    @Inject(method = "emitGizmos", at = @At("TAIL"))
     private void onDebugRender(
             Frustum frustum,
             double cameraX,
@@ -26,12 +26,12 @@ public class DebugRendererMixin {
         BlockHighlighter highlighter = BlockHighlighter.getInstance();
         if (!highlighter.hasHighlights()) return;
 
-        MatrixStack matrices = new MatrixStack();
-        Vec3d cameraPos = new Vec3d(cameraX, cameraY, cameraZ);
-        try (BufferAllocator allocator = new BufferAllocator(262_144)) {
-            VertexConsumerProvider.Immediate vertexConsumers = VertexConsumerProvider.immediate(allocator);
+        PoseStack matrices = new PoseStack();
+        Vec3 cameraPos = new Vec3(cameraX, cameraY, cameraZ);
+        try (ByteBufferBuilder allocator = new ByteBufferBuilder(262_144)) {
+            MultiBufferSource.BufferSource vertexConsumers = MultiBufferSource.immediate(allocator);
             highlighter.renderHighlights(matrices, vertexConsumers, cameraPos);
-            vertexConsumers.draw();
+            vertexConsumers.endBatch();
         }
     }
 }

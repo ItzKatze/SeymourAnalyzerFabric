@@ -27,7 +27,7 @@ repositories {
 
 dependencies {
     add("minecraft", "com.mojang:minecraft:${property("minecraft_version")}")
-    add("mappings", "net.fabricmc:yarn:${property("yarn_mappings")}:v2")
+    add("mappings", loom.officialMojangMappings())
     add("modImplementation", "net.fabricmc:fabric-loader:${property("loader_version")}")
     add("modImplementation", "net.fabricmc.fabric-api:fabric-api:${property("fabric_api_version")}")
 

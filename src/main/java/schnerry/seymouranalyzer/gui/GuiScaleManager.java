@@ -1,8 +1,8 @@
 package schnerry.seymouranalyzer.gui;
 
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
-import net.minecraft.client.MinecraftClient;
-import net.minecraft.client.gui.screen.Screen;
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.gui.screens.Screen;
 import schnerry.seymouranalyzer.Seymouranalyzer;
 
 /**
@@ -30,24 +30,21 @@ public class GuiScaleManager {
      * Call this when a mod GUI is opened
      */
     public void onModGuiOpen() {
-        MinecraftClient client = MinecraftClient.getInstance();
-        if (client == null || client.options == null) return;
+        Minecraft client = Minecraft.getInstance();
 
         // Save original scale if not already saved
         if (originalGuiScale == -1) {
-            originalGuiScale = client.options.getGuiScale().getValue();
+            originalGuiScale = client.options.guiScale().get();
             Seymouranalyzer.LOGGER.info("[GuiScale] Saved original GUI scale: " + originalGuiScale);
         }
 
         isModGuiOpen = true;
 
         // Set scale to 2
-        if (client.options.getGuiScale().getValue() != 2) {
-            client.options.getGuiScale().setValue(2);
-            if (client.getWindow() != null) {
-                client.getWindow().setScaleFactor(2);
-            }
-            client.onResolutionChanged();
+        if (client.options.guiScale().get() != 2) {
+            client.options.guiScale().set(2);
+            client.getWindow().setGuiScale(2);
+            client.resizeDisplay();
             Seymouranalyzer.LOGGER.info("[GuiScale] Set GUI scale to 2");
         }
     }
@@ -56,13 +53,12 @@ public class GuiScaleManager {
      * Call this when a mod GUI is closed
      */
     public void onModGuiClose() {
-        MinecraftClient client = MinecraftClient.getInstance();
-        if (client == null || client.options == null) return;
+        Minecraft client = Minecraft.getInstance();
 
         isModGuiOpen = false;
 
         // Check if we're still in a mod GUI (nested GUIs)
-        Screen currentScreen = client.currentScreen;
+        Screen currentScreen = client.screen;
         if (isModScreen(currentScreen)) {
             Seymouranalyzer.LOGGER.info("[GuiScale] Still in mod GUI, keeping scale at 2");
             return;
@@ -70,11 +66,9 @@ public class GuiScaleManager {
 
         // Restore original scale if we saved one
         if (originalGuiScale != -1) {
-            client.options.getGuiScale().setValue(originalGuiScale);
-            if (client.getWindow() != null) {
-                client.getWindow().setScaleFactor(originalGuiScale);
-            }
-            client.onResolutionChanged();
+            client.options.guiScale().set(originalGuiScale);
+            client.getWindow().setGuiScale(originalGuiScale);
+            client.resizeDisplay();
             Seymouranalyzer.LOGGER.info("[GuiScale] Restored GUI scale to " + originalGuiScale);
             originalGuiScale = -1; // Reset
         }
@@ -96,10 +90,9 @@ public class GuiScaleManager {
      * Force update check - call this periodically to ensure scale is correct
      */
     public void tick() {
-        MinecraftClient client = MinecraftClient.getInstance();
-        if (client == null || client.options == null) return;
+        Minecraft client = Minecraft.getInstance();
 
-        Screen currentScreen = client.currentScreen;
+        Screen currentScreen = client.screen;
         boolean shouldBeModGui = isModScreen(currentScreen);
 
         // Debug logging
@@ -123,10 +116,9 @@ public class GuiScaleManager {
      * Check if we're currently in a mod GUI
      */
     public boolean isInModGui() {
-        MinecraftClient client = MinecraftClient.getInstance();
-        if (client == null) return false;
+        Minecraft client = Minecraft.getInstance();
 
-        return isModScreen(client.currentScreen);
+        return isModScreen(client.screen);
     }
 
     /**

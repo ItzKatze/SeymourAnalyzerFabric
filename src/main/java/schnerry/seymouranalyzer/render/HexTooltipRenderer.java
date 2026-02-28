@@ -3,14 +3,14 @@ package schnerry.seymouranalyzer.render;
 import lombok.Getter;
 import lombok.Setter;
 import net.fabricmc.fabric.api.client.item.v1.ItemTooltipCallback;
-import net.minecraft.component.DataComponentTypes;
-import net.minecraft.component.type.DyedColorComponent;
-import net.minecraft.component.type.NbtComponent;
-import net.minecraft.item.ItemStack;
-import net.minecraft.item.tooltip.TooltipType;
-import net.minecraft.nbt.NbtCompound;
-import net.minecraft.text.MutableText;
-import net.minecraft.text.Text;
+import net.minecraft.core.component.DataComponents;
+import net.minecraft.nbt.CompoundTag;
+import net.minecraft.network.chat.Component;
+import net.minecraft.network.chat.MutableComponent;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.TooltipFlag;
+import net.minecraft.world.item.component.CustomData;
+import net.minecraft.world.item.component.DyedItemColor;
 import schnerry.seymouranalyzer.analyzer.ColorAnalyzer;
 import schnerry.seymouranalyzer.scanner.ChestScanner;
 import schnerry.seymouranalyzer.util.ItemStackUtils;
@@ -47,7 +47,7 @@ public class HexTooltipRenderer {
      * Called when tooltip is rendered - add hex code line
      */
     @SuppressWarnings("unused")
-    private void onTooltip(ItemStack stack, TooltipType tooltipType, List<Text> lines) {
+    private void onTooltip(ItemStack stack, TooltipFlag tooltipType, List<Component> lines) {
         if (!enabled) return;
         if (stack.isEmpty()) return;
 
@@ -71,22 +71,22 @@ public class HexTooltipRenderer {
 
         if (displayHex == null) return;
 
-        String itemName = stack.getName().getString();
+        String itemName = stack.getHoverName().getString();
         boolean isSeymourArmor = StringUtility.isSeymourArmor(itemName);
 
         // Parse hex to RGB for coloring the text
         int rgb = hexToRgb(displayHex);
 
         // Build the first line: "Hex: #XXXXXX"
-        MutableText hexText = Text.literal("Hex: ")
-            .styled(style -> style.withColor(0xA8A8A8).withItalic(false)) // Gray for "Hex: "
-            .append(Text.literal("#" + displayHex)
-                .styled(style -> style.withColor(rgb).withItalic(false))); // Actual color for hex code
+        MutableComponent hexText = Component.literal("Hex: ")
+            .withStyle(style -> style.withColor(0xA8A8A8).withItalic(false)) // Gray for "Hex: "
+            .append(Component.literal("#" + displayHex)
+                .withStyle(style -> style.withColor(rgb).withItalic(false))); // Actual color for hex code
 
         // If item has been dyed, add a big red warning with the original hex
         if (dyeInfo.isDyed) {
-            hexText.append(Text.literal(" [DYED - Original: #" + dyeInfo.originalHex + "]")
-                .styled(style -> style.withColor(0xFF5555).withItalic(false).withBold(true))); // Bright red, bold
+            hexText.append(Component.literal(" [DYED - Original: #" + dyeInfo.originalHex + "]")
+                .withStyle(style -> style.withColor(0xFF5555).withItalic(false).withBold(true))); // Bright red, bold
         }
 
         // Insert after the item name (usually line 0) and before stats
@@ -110,14 +110,14 @@ public class HexTooltipRenderer {
                         analysis.bestMatch().isCustom());
 
                 // Build the second line: "Closest: Match Name - ΔE"
-                MutableText closestText = Text.literal("Closest: ")
-                    .styled(style -> style.withColor(0xA8A8A8).withItalic(false)) // Gray for "Closest: "
-                    .append(Text.literal(matchName)
-                        .styled(style -> style.withColor(0xFFFFFF).withItalic(false))) // White for match name
-                    .append(Text.literal(" - ")
-                        .styled(style -> style.withColor(0xA8A8A8).withItalic(false)))
-                    .append(Text.literal("ΔE: " + String.format("%.2f", deltaE))
-                        .styled(style -> style.withColor(closenessColor).withItalic(false))); // Colored deltaE
+                MutableComponent closestText = Component.literal("Closest: ")
+                    .withStyle(style -> style.withColor(0xA8A8A8).withItalic(false)) // Gray for "Closest: "
+                    .append(Component.literal(matchName)
+                        .withStyle(style -> style.withColor(0xFFFFFF).withItalic(false))) // White for match name
+                    .append(Component.literal(" - ")
+                        .withStyle(style -> style.withColor(0xA8A8A8).withItalic(false)))
+                    .append(Component.literal("ΔE: " + String.format("%.2f", deltaE))
+                        .withStyle(style -> style.withColor(closenessColor).withItalic(false))); // Colored deltaE
 
                 // Insert right after the hex line
                 lines.add(insertIndex + 1, closestText);
@@ -157,7 +157,7 @@ public class HexTooltipRenderer {
      * Find the best position to insert the hex line
      * Want it after the name but before stats/abilities
      */
-    private int findInsertionPoint(List<Text> lines) {
+    private int findInsertionPoint(List<Component> lines) {
         // Look for the first empty line or stat line
         for (int i = 1; i < lines.size(); i++) {
             String text = lines.get(i).getString();
@@ -198,8 +198,8 @@ public class HexTooltipRenderer {
      */
     private DyeInfo checkDyeStatus(ItemStack stack) {
         // Check for original color in custom_data (Seymour items store it as "R:G:B")
-        NbtComponent nbtComponent = stack.getOrDefault(DataComponentTypes.CUSTOM_DATA, NbtComponent.DEFAULT);
-        NbtCompound nbt = nbtComponent.copyNbt();
+        CustomData nbtComponent = stack.getOrDefault(DataComponents.CUSTOM_DATA, CustomData.EMPTY);
+        CompoundTag nbt = nbtComponent.copyTag();
 
         String originalHex = null;
         if (nbt.contains("color")) {
@@ -210,7 +210,7 @@ public class HexTooltipRenderer {
         }
 
         // Check for dyed_color component
-        DyedColorComponent dyedColor = stack.getOrDefault(DataComponentTypes.DYED_COLOR, null);
+        DyedItemColor dyedColor = stack.getOrDefault(DataComponents.DYED_COLOR, null);
         String dyedHex = null;
         if (dyedColor != null) {
             int rgb = dyedColor.rgb();

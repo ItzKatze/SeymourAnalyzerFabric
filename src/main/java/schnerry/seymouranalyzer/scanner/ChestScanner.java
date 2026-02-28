@@ -1,17 +1,17 @@
 package schnerry.seymouranalyzer.scanner;
 
 import lombok.Getter;
-import net.minecraft.client.MinecraftClient;
-import net.minecraft.client.gui.screen.ingame.GenericContainerScreen;
-import net.minecraft.entity.decoration.ItemFrameEntity;
-import net.minecraft.item.ItemStack;
-import net.minecraft.screen.slot.Slot;
-import net.minecraft.text.Text;
-import net.minecraft.util.hit.BlockHitResult;
-import net.minecraft.util.hit.HitResult;
-import net.minecraft.util.math.BlockPos;
-import net.minecraft.util.math.Box;
-import net.minecraft.world.World;
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.gui.screens.inventory.ContainerScreen;
+import net.minecraft.core.BlockPos;
+import net.minecraft.network.chat.Component;
+import net.minecraft.world.entity.decoration.ItemFrame;
+import net.minecraft.world.inventory.Slot;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.level.Level;
+import net.minecraft.world.phys.AABB;
+import net.minecraft.world.phys.BlockHitResult;
+import net.minecraft.world.phys.HitResult;
 import schnerry.seymouranalyzer.Seymouranalyzer;
 import schnerry.seymouranalyzer.analyzer.ColorAnalyzer;
 import schnerry.seymouranalyzer.analyzer.PatternDetector;
@@ -74,13 +74,13 @@ public class ChestScanner {
     /**
      * Tick handler - checks for GUI opens and item frame scanning
      */
-    public void tick(MinecraftClient client) {
+    public void tick(Minecraft client) {
         if (!scanningEnabled && !exportingEnabled) return;
 
         long now = System.currentTimeMillis();
 
         // Check for chest GUI opened
-        if (client.currentScreen instanceof GenericContainerScreen screen) {
+        if (client.screen instanceof ContainerScreen screen) {
             if (now - lastChestOpenTime >= SCAN_DELAY_MS) {
                 lastChestOpenTime = now;
                 scanChestContents(screen, client);
@@ -97,21 +97,19 @@ public class ChestScanner {
     /**
      * Scan chest contents - exact port from index.js scanChestContents()
      */
-    private void scanChestContents(GenericContainerScreen screen, MinecraftClient client) {
+    private void scanChestContents(ContainerScreen screen, Minecraft client) {
         if (!scanningEnabled && !exportingEnabled) return;
 
         try {
-            if (screen.getScreenHandler() == null) return;
-
             ArmorPiece.ChestLocation chestLoc = getChestLocationFromLooking(client);
-            List<Slot> slots = screen.getScreenHandler().slots;
+            List<Slot> slots = screen.getMenu().slots;
             int scannedCount = 0;
 
             for (Slot slot : slots) {
-                ItemStack stack = slot.getStack();
+                ItemStack stack = slot.getItem();
                 if (stack.isEmpty()) continue;
 
-                String itemName = stack.getName().getString();
+                String itemName = stack.getHoverName().getString();
                 if (!StringUtility.isSeymourArmor(itemName)) continue;
 
                 String uuid = ItemStackUtils.getOrCreateItemUUID(stack);
@@ -185,8 +183,8 @@ public class ChestScanner {
             if (scannedCount > 0 && !exportingEnabled) {
                 int total = CollectionManager.getInstance().size();
                 if (client.player != null) {
-                    client.player.sendMessage(
-                        Text.literal("§a[Seymour Analyzer] §7Scanned §e" + scannedCount +
+                    client.player.displayClientMessage(
+                        Component.literal("§a[Seymour Analyzer] §7Scanned §e" + scannedCount +
                             "§7 new piece" + (scannedCount == 1 ? "" : "s") +
                             "! Total: §e" + total),
                         false
@@ -195,8 +193,8 @@ public class ChestScanner {
             } else if (scannedCount > 0) {
                 // exportingEnabled is true here
                 if (client.player != null) {
-                    client.player.sendMessage(
-                        Text.literal("§a[Seymour Analyzer] §7Added §e" + scannedCount +
+                    client.player.displayClientMessage(
+                        Component.literal("§a[Seymour Analyzer] §7Added §e" + scannedCount +
                             "§7 piece" + (scannedCount == 1 ? "" : "s") +
                             " to export collection! Total: §e" + exportCollection.size()),
                         false
@@ -212,16 +210,16 @@ public class ChestScanner {
     /**
      * Read item frames - exact port from index.js readItemFrames()
      */
-    private void readItemFrames(MinecraftClient client) {
+    private void readItemFrames(Minecraft client) {
         if (!ClothConfig.getInstance().isItemFramesEnabled() || (!scanningEnabled && !exportingEnabled)) {
             return;
         }
 
         try {
-            World world = client.world;
+            Level world = client.level;
             if (world == null) return;
 
-            List<ItemFrameEntity> itemFrames = new ArrayList<>();
+            List<ItemFrame> itemFrames = new ArrayList<>();
 
             // Create a bounding box around the player (64 block radius in all directions)
             if (client.player != null) {
@@ -230,21 +228,21 @@ public class ChestScanner {
                 double z = client.player.getZ();
                 double radius = 64.0;
 
-                Box searchBox = new Box(
+                AABB searchBox = new AABB(
                     x - radius, y - radius, z - radius,
                     x + radius, y + radius, z + radius
                 );
 
                 // Use entity selector to find all item frame entities within the box
-                itemFrames.addAll(world.getEntitiesByClass(ItemFrameEntity.class, searchBox, frame -> true));
+                itemFrames.addAll(world.getEntitiesOfClass(ItemFrame.class, searchBox, frame -> true));
             }
 
             if (itemFrames.isEmpty()) return;
 
             int pieceCount = 0;
 
-            for (ItemFrameEntity frame : itemFrames) {
-                ItemStack stack = frame.getHeldItemStack();
+            for (ItemFrame frame : itemFrames) {
+                ItemStack stack = frame.getItem();
 
                 if (stack.isEmpty()) continue;
 
@@ -254,7 +252,7 @@ public class ChestScanner {
                     (int) Math.floor(frame.getZ())
                 );
 
-                String itemName = stack.getName().getString();
+                String itemName = stack.getHoverName().getString();
 
                 if (!StringUtility.isSeymourArmor(itemName)) continue;
 
@@ -331,8 +329,8 @@ public class ChestScanner {
             if (pieceCount > 0 && !exportingEnabled) {
                 int total = CollectionManager.getInstance().size();
                 if (client.player != null) {
-                    client.player.sendMessage(
-                        Text.literal("§a[Seymour Analyzer] §7Scanned §e" + pieceCount +
+                    client.player.displayClientMessage(
+                        Component.literal("§a[Seymour Analyzer] §7Scanned §e" + pieceCount +
                             "§7 new piece" + (pieceCount == 1 ? "" : "s") +
                             " from item frames! Total: §e" + total),
                         false
@@ -341,8 +339,8 @@ public class ChestScanner {
             } else if (pieceCount > 0) {
                 // exportingEnabled is true here
                 if (client.player != null) {
-                    client.player.sendMessage(
-                        Text.literal("§a[Seymour Analyzer] §7Added §e" + pieceCount +
+                    client.player.displayClientMessage(
+                        Component.literal("§a[Seymour Analyzer] §7Added §e" + pieceCount +
                             "§7 piece" + (pieceCount == 1 ? "" : "s") +
                             " from item frames to export collection! Total: §e" + exportCollection.size()),
                         false
@@ -358,10 +356,10 @@ public class ChestScanner {
     /**
      * Get chest location from player's crosshair
      */
-    private ArmorPiece.ChestLocation getChestLocationFromLooking(MinecraftClient client) {
+    private ArmorPiece.ChestLocation getChestLocationFromLooking(Minecraft client) {
         if (client.player == null) return null;
 
-        HitResult hit = client.crosshairTarget;
+        HitResult hit = client.hitResult;
         if (hit != null && hit.getType() == HitResult.Type.BLOCK) {
             BlockPos pos = ((BlockHitResult) hit).getBlockPos();
             return new ArmorPiece.ChestLocation(pos.getX(), pos.getY(), pos.getZ());
