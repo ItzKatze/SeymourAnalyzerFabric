@@ -12,7 +12,6 @@ import net.minecraft.world.item.TooltipFlag;
 import net.minecraft.world.item.component.CustomData;
 import net.minecraft.world.item.component.DyedItemColor;
 import schnerry.seymouranalyzer.analyzer.ColorAnalyzer;
-import schnerry.seymouranalyzer.scanner.ChestScanner;
 import schnerry.seymouranalyzer.util.ItemStackUtils;
 import schnerry.seymouranalyzer.util.StringUtility;
 
@@ -64,7 +63,6 @@ public class HexTooltipRenderer {
             hexForAnalysis = dyeInfo.originalHex;
         } else {
             // Not dyed: extract hex normally and use it for both
-            ChestScanner scanner = new ChestScanner();
             displayHex = ItemStackUtils.extractHex(stack);
             hexForAnalysis = displayHex;
         }
