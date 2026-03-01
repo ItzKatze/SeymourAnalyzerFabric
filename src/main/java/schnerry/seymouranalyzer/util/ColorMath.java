@@ -140,9 +140,9 @@ public class ColorMath {
         try {
             String[] parts = rgbString.split(":");
             if (parts.length == 3) {
-                int r = Integer.parseInt(parts[0]);
-                int g = Integer.parseInt(parts[1]);
-                int b = Integer.parseInt(parts[2]);
+                int r = Integer.parseInt(parts[0].trim());
+                int g = Integer.parseInt(parts[1].trim());
+                int b = Integer.parseInt(parts[2].trim());
                 return String.format("%02X%02X%02X",
                         Math.max(0, Math.min(255, r)),
                         Math.max(0, Math.min(255, g)),

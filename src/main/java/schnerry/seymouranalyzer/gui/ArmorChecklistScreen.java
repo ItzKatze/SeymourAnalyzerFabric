@@ -9,6 +9,7 @@ import schnerry.seymouranalyzer.data.ArmorPiece;
 import schnerry.seymouranalyzer.data.ChecklistCache;
 import schnerry.seymouranalyzer.data.CollectionManager;
 import schnerry.seymouranalyzer.util.ColorMath;
+import schnerry.seymouranalyzer.util.PieceTypeUtil;
 
 import java.io.InputStream;
 import java.io.InputStreamReader;
@@ -398,20 +399,7 @@ public class ArmorChecklistScreen extends ModScreen {
                 for (Map.Entry<String, ArmorPiece> collectionEntry : collection.entrySet()) {
                     String uuid = collectionEntry.getKey();
                     ArmorPiece piece = collectionEntry.getValue();
-                    String pieceName = piece.getPieceName().toLowerCase();
-                    boolean typeMatches = false;
-
-                    if (pieceType.equals("helmet") && (pieceName.contains("helm") || pieceName.contains("hat") || pieceName.contains("hood") || pieceName.contains("crown"))) {
-                        typeMatches = true;
-                    } else if (pieceType.equals("chestplate") && (pieceName.contains("chest") || pieceName.contains("tunic") || pieceName.contains("jacket"))) {
-                        typeMatches = true;
-                    } else if (pieceType.equals("leggings") && (pieceName.contains("legging") || pieceName.contains("pants") || pieceName.contains("trousers"))) {
-                        typeMatches = true;
-                    } else if (pieceType.equals("boots") && (pieceName.contains("boot") || pieceName.contains("shoes") || pieceName.contains("sneakers"))) {
-                        typeMatches = true;
-                    }
-
-                    if (typeMatches) {
+                    if (PieceTypeUtil.matchesPieceType(piece.getPieceName(), pieceType)) {
                         double deltaE = ColorMath.calculateDeltaE(entry.hex, piece.getHexcode());
                         if (deltaE <= 5.0) {
                             // Mark if this piece is actually needed for this entry

@@ -11,6 +11,7 @@ import java.util.stream.Collectors;
 
 public class ColorAnalyzer {
     private static ColorAnalyzer INSTANCE;
+    private static final double PRIORITY_DELTA_E_WINDOW = 0.75;
     private final ColorDatabase colorDatabase;
 
     private ColorAnalyzer() {
@@ -45,7 +46,7 @@ public class ColorAnalyzer {
 
         // Collect matches from each category separately to prevent one category from crowding out others
         List<ColorMatch> customMatches = new ArrayList<>();
-        List<ColorMatch> normalMatches = new ArrayList<>();
+        List<ColorMatch> normalMatches;
         List<ColorMatch> fadeMatches = new ArrayList<>();
 
         // Check custom colors first if enabled
@@ -137,7 +138,12 @@ public class ColorAnalyzer {
         finalList.addAll(prioritizedMatches);
         finalList.addAll(unprioritizedMatches);
 
-        // Step 6: Get top 3 from the combined list
+        // Step 7: Apply safety guards to avoid inaccurate best-match picks
+        // - Do not allow a T3+ result if any T0-T2 candidate exists
+        // - Do not let priority override a materially closer normal/custom candidate
+        finalList = applySelectionGuards(finalList);
+
+        // Step 8: Get top 3 from the combined list
         List<ColorMatch> top3 = finalList.stream()
             .limit(3)
             .collect(Collectors.toList());
@@ -151,6 +157,49 @@ public class ColorAnalyzer {
         int tier = calculateTier(best.deltaE, best.isCustom, best.isFade);
 
         return new AnalysisResult(best, top3, tier);
+    }
+
+    /**
+     * Guardrails for final selection to reduce false positives where priority pushes a worse match to the top.
+     */
+    private List<ColorMatch> applySelectionGuards(List<ColorMatch> input) {
+        if (input == null || input.isEmpty()) {
+            return input;
+        }
+
+        List<ColorMatch> guarded = new ArrayList<>(input);
+        ColorMatch currentBest = guarded.getFirst();
+
+        // Guard 1: if best is T3+, prefer the closest T0-T2 candidate if one exists.
+        if (currentBest.tier > 2) {
+            Optional<ColorMatch> bestTier2OrLower = guarded.stream()
+                .filter(m -> m.tier <= 2)
+                .min(Comparator.comparingDouble(m -> m.deltaE));
+
+            if (bestTier2OrLower.isPresent()) {
+                ColorMatch better = bestTier2OrLower.get();
+                guarded.remove(better);
+                guarded.addFirst(better);
+                currentBest = better;
+            }
+        }
+
+        // Guard 2: if best is fade, but a normal/custom match is close in deltaE, prefer non-fade.
+        // This avoids selecting fade T2 over plausible normal T1/T2 due to priority settings.
+        if (currentBest.isFade) {
+            double maxAllowedDeltaE = currentBest.deltaE + PRIORITY_DELTA_E_WINDOW;
+            Optional<ColorMatch> bestNonFadeNear = guarded.stream()
+                .filter(m -> !m.isFade && m.tier <= 2 && m.deltaE <= maxAllowedDeltaE)
+                .min(Comparator.comparingDouble(m -> m.deltaE));
+
+            if (bestNonFadeNear.isPresent()) {
+                ColorMatch better = bestNonFadeNear.get();
+                guarded.remove(better);
+                guarded.addFirst(better);
+            }
+        }
+
+        return guarded;
     }
 
     private List<ColorMatch> findMatchesInMap(String itemHex, String pieceType,
@@ -195,6 +244,12 @@ public class ColorAnalyzer {
 
         String lower = colorName.toLowerCase();
 
+        // 3p entries are multi-piece sets (chestplate/leggings/boots), never helmets.
+        // Treat them as valid for non-helmet pieces when piece-specific matching is enabled.
+        if (lower.contains("3p")) {
+            return !"helmet".equals(pieceType);
+        }
+
         // Special handling for multi-piece names (e.g., "Challenger's Leggings+Boots", "Speedster Set/Mercenary Boots")
         // If the name contains the current piece type, allow it
         if (pieceType.equals("helmet") && (lower.contains("helmet") || lower.contains("hat") || lower.contains("hood") || lower.contains("cap") || lower.contains("crown") || lower.contains("mask"))) {
@@ -215,8 +270,7 @@ public class ColorAnalyzer {
             lower.contains("helmet") || lower.contains("hat") || lower.contains("hood") || lower.contains("cap") || lower.contains("crown") || lower.contains("mask") ||
             lower.contains("chestplate") || lower.contains("chest") || lower.contains("tunic") || lower.contains("jacket") || lower.contains("shirt") || lower.contains("vest") || lower.contains("robe") ||
             lower.contains("leggings") || lower.contains("pants") || lower.contains("trousers") ||
-            lower.contains("boots") || lower.contains("shoes") || lower.contains("sandals") || lower.contains("sneakers") ||
-            lower.contains("3p");
+            lower.contains("boots") || lower.contains("shoes") || lower.contains("sandals") || lower.contains("sneakers");
 
         if (!containsAnyPieceType) {
             return true; // Generic color, works for all piece types
