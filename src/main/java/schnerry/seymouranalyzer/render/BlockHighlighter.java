@@ -132,7 +132,13 @@ public class BlockHighlighter {
         float ny = dy / len;
         float nz = dz / len;
 
-        consumer.addVertex(matrix, x1, y1, z1).setColor(r, g, b, a).setNormal(nx, ny, nz);
-        consumer.addVertex(matrix, x2, y2, z2).setColor(r, g, b, a).setNormal(nx, ny, nz);
+        consumer.addVertex(matrix, x1, y1, z1)
+            .setColor(r, g, b, a)
+            .setNormal(nx, ny, nz)
+            .setLineWidth(1.0f);
+        consumer.addVertex(matrix, x2, y2, z2)
+            .setColor(r, g, b, a)
+            .setNormal(nx, ny, nz)
+            .setLineWidth(1.0f);
     }
 }
